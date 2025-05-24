@@ -90,7 +90,7 @@ Open Questions:
 - [Question 2]
 </genealogy>`;
 
-							// Call Anthropic API
+							// Call Anthropic API with streaming
 							const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
 							const anthropicApiKey = env.ANTHROPIC_API_KEY;
 
@@ -111,78 +111,106 @@ Open Questions:
 									model: 'claude-sonnet-4-20250514',
 									messages: [{ role: 'user', content: prompt }],
 									max_tokens: 1500,
+									stream: true
 								}),
 							});
 
 							if (!llmRes.ok) {
 								const errorBody = await llmRes.text();
+								console.error('Claude API error:', errorBody);
 								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"AI service error: ${errorBody}"}\n\n`));
 								controller.close();
 								return;
 							}
 
-							const llmJson = (await llmRes.json()) as any;
-							
-							let rawGenealogyContent = '';
-							if (llmJson.content && Array.isArray(llmJson.content) && llmJson.content.length > 0) {
-								const textBlock = llmJson.content.find((block: any) => block.type === 'text');
-								if (textBlock && textBlock.text) {
-									rawGenealogyContent = textBlock.text;
-								} else if (llmJson.content[0].type === 'text' && llmJson.content[0].text) {
-									rawGenealogyContent = llmJson.content[0].text;
-								}
-							}
-
-							if (!rawGenealogyContent) {
-								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"Could not extract content from AI response"}\n\n`));
-								controller.close();
-								return;
-							}
-
-							// Extract content within <genealogy> tags
-							const genealogyMatch = rawGenealogyContent.match(/<genealogy>([\s\S]*?)<\/genealogy>/);
-							const finalContent = genealogyMatch && genealogyMatch[1] ? genealogyMatch[1].trim() : rawGenealogyContent.trim();
-
-							// Parse and stream genealogy items
-							const lines = finalContent.split('\n');
-							const itemRegex = /^(.*?)\s\((.*?)\)\s\[\[(.*?)\]\]\s—\s(.*?)$/;
+							// Process Claude's streaming response
+							const reader = llmRes.body!.getReader();
+							const decoder = new TextDecoder();
+							let buffer = '';
+							let accumulator = '';
 							let readingQuestions = false;
+							const processedItems = new Set();
+							const processedQuestions = new Set();
 
-							for (const line of lines) {
-								const trimmedLine = line.trim();
-								if (!trimmedLine) continue;
+							try {
+								while (true) {
+									const { done, value } = await reader.read();
+									if (done) break;
 
-								if (trimmedLine.toLowerCase().startsWith('open questions:')) {
-									readingQuestions = true;
-									controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
-									continue;
-								}
+									buffer += decoder.decode(value, { stream: true });
+									const lines = buffer.split('\n');
+									buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-								if (readingQuestions) {
-									if (trimmedLine.startsWith('-')) {
-										const questionText = trimmedLine.substring(1).trim();
-										if (questionText) {
-											controller.enqueue(new TextEncoder().encode(`data: {"type":"question","text":"${questionText.replace(/"/g, '\\"')}"}\n\n`));
+									for (const line of lines) {
+										if (line.startsWith('data: ')) {
+											try {
+												const data = JSON.parse(line.slice(6));
+												
+												if (data.type === 'content_block_delta' && data.delta?.text) {
+													accumulator += data.delta.text;
+													
+													// Check for questions section first
+													if (accumulator.toLowerCase().includes('open questions:') && !readingQuestions) {
+														readingQuestions = true;
+														controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
+													}
+													
+													// Parse genealogy items (only if not in questions section)
+													if (!readingQuestions) {
+														// Look for complete genealogy items in the accumulator
+														// Match format: "Title (Year) [[URL]] — Claim"
+														const itemPattern = /([^(\n]+)\s*\(([^)]+)\)\s*\[\[([^\]]+)\]\]\s*—\s*([^.\n]+(?:\.[^.\n]*)?)\./g;
+														let match;
+														while ((match = itemPattern.exec(accumulator)) !== null) {
+															const [fullMatch, title, year, url, claim] = match;
+															const itemKey = `${title.trim()}_${year.trim()}`;
+															
+															if (!processedItems.has(itemKey) && 
+																title.trim().length > 5 && 
+																claim.trim().length > 10) {
+																processedItems.add(itemKey);
+																
+																const item = {
+																	type: "genealogy_item",
+																	title: title.trim(),
+																	year: year.trim(),
+																	url: url.trim(),
+																	claim: claim.trim()
+																};
+																
+																controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(item)}\n\n`));
+															}
+														}
+													}
+													
+													// Parse questions (only if in questions section)
+													if (readingQuestions) {
+														// Look for complete questions ending with punctuation
+														const questionPattern = /-\s*([^?\n]+\?)/g;
+														let questionMatch;
+														while ((questionMatch = questionPattern.exec(accumulator)) !== null) {
+															const questionText = questionMatch[1].trim();
+															
+															// Filter out partial questions and genealogy remnants
+															if (questionText.length > 20 && 
+																!questionText.includes('[[') && 
+																!questionText.includes('—') &&
+																!processedQuestions.has(questionText)) {
+																
+																processedQuestions.add(questionText);
+																controller.enqueue(new TextEncoder().encode(`data: {"type":"question","text":"${questionText.replace(/"/g, '\\"')}"}\n\n`));
+															}
+														}
+													}
+												}
+											} catch (parseError) {
+												// Ignore parsing errors in streaming
+											}
 										}
 									}
-									continue;
 								}
-
-								const match = trimmedLine.match(itemRegex);
-								if (match) {
-									const [, title, year, url, claim] = match;
-									const item = {
-										type: "genealogy_item",
-										title: title,
-										year: year,
-										url: url,
-										claim: claim
-									};
-									controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(item)}\n\n`));
-									
-									// Add small delay to make streaming more visible
-									await new Promise(resolve => setTimeout(resolve, 200));
-								}
+							} finally {
+								reader.releaseLock();
 							}
 
 							controller.enqueue(new TextEncoder().encode(`data: {"type":"complete"}\n\n`));

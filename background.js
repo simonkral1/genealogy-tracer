@@ -160,9 +160,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const textToTrace = request.selectedTextOverride;
     
     if (textToTrace) {
-      // Direct trace without getting selected text
-      console.log('Tracing provided text:', textToTrace);
-      performTrace(textToTrace, sendResponse);
+      // Send the text directly to popup for streaming
+      sendResponse({ selectedText: textToTrace });
     } else {
       // Use stored selected text from when icon was clicked
       if (storedTabInfo && storedTabInfo.error) {
@@ -171,8 +170,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       
       if (storedSelectedText) {
-        console.log('Using stored selected text:', storedSelectedText);
-        performTrace(storedSelectedText, sendResponse);
+        console.log('Sending stored selected text to popup:', storedSelectedText);
+        sendResponse({ selectedText: storedSelectedText });
       } else {
         sendResponse({ error: 'No text was selected when the extension was opened.' });
       }
