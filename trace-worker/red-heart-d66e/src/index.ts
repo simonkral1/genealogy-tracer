@@ -11,78 +11,67 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+// Define Env interface if you have bindings in wrangler.toml (like ANTHROPIC_API_KEY as a secret)
+interface Env {
+	ANTHROPIC_API_KEY: string;
+	// If you were using Cloudflare AI bindings for Anthropic:
+	// AI: any; 
+}
+
 export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		// CORS pre‑flight
-		if (request.method === 'OPTIONS') {
+	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
+		const url = new URL(request.url);
+
+		// CORS pre-flight for /trace (if you anticipate direct calls from browsers not using the extension)
+		if (url.pathname === '/trace' && request.method === 'OPTIONS') {
 			return new Response(null, {
 				headers: {
-					'Access-Control-Allow-Origin': '*',
+					'Access-Control-Allow-Origin': '*', // Or restrict to your extension ID: chrome-extension://YOUR_EXTENSION_ID
 					'Access-Control-Allow-Methods': 'POST, OPTIONS',
-					'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+					'Access-Control-Allow-Headers': 'Content-Type',
 				},
 			});
 		}
 
-		if (request.method !== 'POST') {
-			return new Response('Method Not Allowed', { status: 405 });
-		}
+		if (url.pathname === '/trace' && request.method === 'POST') {
+			try {
+				const query = await request.text(); // Expecting plain text query
+				if (!query) {
+					return new Response(JSON.stringify({ error: 'Missing query text' }), {
+						status: 400,
+						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+					});
+				}
 
-		let query: string | undefined;
-		try {
-			const body = (await request.json()) as { query?: string };
-			query = body.query;
-		} catch (e) {
-			return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-				status: 400,
-				headers: { 'Content-Type': 'application/json' },
-			});
-		}
-		if (!query) {
-			return new Response(JSON.stringify({ error: 'Missing "query" field' }), {
-				status: 400,
-				headers: { 'Content-Type': 'application/json' },
-			});
-		}
+				// Streamlined Wikipedia search (reduced to 3 results for speed)
+				const wikiURL =
+					'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+					encodeURIComponent(query) +
+					'&format=json&origin=*&srlimit=3'; // Reduced from 5 to 3 for speed
+				const wikiRes = await fetch(wikiURL);
+				const wikiJson = (await wikiRes.json()) as any;
+				const titles = wikiJson.query.search.slice(0, 3).map((i: any) => i.title);
 
-		// 1‑hop Wikipedia search (cheap & fast)
-		const wikiURL =
-			'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
-			encodeURIComponent(query) +
-			'&format=json&origin=*';
-		const wikiRes = await fetch(wikiURL);
-		const wikiJson = (await wikiRes.json()) as any;
-		const titles = wikiJson.query.search.slice(0, 5).map((i: any) => i.title);
-
-		// Prompt LLM to craft a concise genealogy list
-		const prompt = `Act as a critical historian and genealogist in the spirit of Nietzsche and Foucault. Your task is to analyze the concept "${query}".
-Leverage your broad knowledge base and the integrated web search tool to unearth foundational texts, thinkers, pivotal moments, and relevant events.
-Go beyond mainstream narratives to uncover potential power dynamics, historical contingencies, and subjugated knowledges that have shaped this concept.
+				// Optimized prompt for speed while maintaining quality
+				const prompt = `Act as a critical historian and genealogist in the spirit of Nietzsche and Foucault. Analyze the concept "${query}".
 
 Construct a five-item genealogy. Each item should follow this format:
 [TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
 
-Guidelines for the genealogy:
+Guidelines:
 1. Prioritize historically influential sources, ideas, or events.
 2. Arrange items chronologically.
 3. Ensure each item offers a unique perspective or marks a significant development.
-4. Use precise language. For URLs, provide direct links to relevant primary sources, academic articles, or comprehensive encyclopedic entries discovered through web search or your knowledge. Cite web search results appropriately.
-5. You may use the provided Wikipedia titles as a starting point for your investigation: ${titles.join(", ")}.
+4. For URLs, provide direct links to relevant primary sources, academic articles, or encyclopedic entries.
+5. Wikipedia titles for reference: ${titles.join(", ")}.
 
-After the genealogy, provide two distinct sections:
+After the genealogy, provide:
 
-First, a "Critique of Genealogy / Methodological Blind Spots":
-This critique should reflect a deep understanding of genealogical method. Instead of generic points, focus on:
-- What power structures might this genealogy (even if critically constructed) still inadvertently reinforce?
-- What voices or perspectives (e.g., non-Western, subaltern, dissident) remain marginalized or unaddressed, even with web search?
-- What are the limitations of the available sources (including those found via web search) in painting a complete picture?
-- Are there unexamined assumptions or epistemological biases in the way the concept is typically framed or in the sources encountered?
-This critique should be concise and actionable for further, deeper inquiry.
+"Critique of Genealogy / Methodological Blind Spots": Focus on what power structures this genealogy might reinforce, what voices remain marginalized, and what epistemological biases exist.
 
-Second, identify one or two "Open Questions" about the core concept "${query}":
-These should be fundamental, still-debated, or unresolved questions that point towards future research or critical reflection, potentially stemming from the methodological blind spots identified. List them as bullet points.
+"Open Questions": List 1-2 fundamental, still-debated questions about "${query}".
 
-Your final output must be structured exactly as follows, removing numbering for genealogy items:
+Format your output exactly as:
 <genealogy>
 [TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
 [TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
@@ -90,102 +79,95 @@ Your final output must be structured exactly as follows, removing numbering for 
 [TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
 [TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
 
-Critique of Genealogy / Methodological Blind Spots: [Your identified critique/blind spot text here]
+Critique of Genealogy / Methodological Blind Spots: [Your critique here]
 
 Open Questions:
-- [Open Question 1 text here]
-- [Open Question 2 text here (if applicable)]
-</genealogy>
+- [Question 1]
+- [Question 2]
+</genealogy>`;
 
-Ensure that your final output contains only the content within the <genealogy> tags, without any additional commentary or explanations.`;
+				// Using direct fetch to Anthropic API with optimized settings
+				const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
+				const anthropicApiKey = env.ANTHROPIC_API_KEY;
 
-		const llmRes = await fetch('https://api.anthropic.com/v1/messages', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'x-api-key': (env as any)["ANTHROPIC_API_KEY"],
-				'anthropic-version': '2023-06-01',
-			},
-			body: JSON.stringify({
-				model: 'claude-3-7-sonnet-latest',
-				messages: [{ role: 'user', content: prompt }],
-				max_tokens: 2048,
-				tools: [{
-					"type": "web_search_20250305",
-					"name": "web_search"
-				}],
-				thinking: {
-					"type": "enabled",
-					"budget_tokens": 1024
+				if (!anthropicApiKey) {
+					console.error("ANTHROPIC_API_KEY is not set in worker environment variables.");
+					return new Response("Server configuration error: Anthropic API key not set.", { 
+						status: 500, 
+						headers: { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' } 
+					});
 				}
-			}),
-		});
+				
+				const llmRes = await fetch(anthropicApiUrl, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-api-key': anthropicApiKey,
+						'anthropic-version': '2023-06-01',
+					},
+					body: JSON.stringify({
+						model: 'claude-sonnet-4-20250514', // Updated to user-specified model
+						messages: [{ role: 'user', content: prompt }],
+						max_tokens: 1500, // Reduced from 2048 for faster response
+					}),
+				});
 
-		const llmJson = (await llmRes.json()) as any;
-		let rawGenealogyContent = '';
-		if (llmJson.content && Array.isArray(llmJson.content)) {
-			const textBlock = llmJson.content.find((block: any) => block.type === 'text');
-			if (textBlock) {
-				rawGenealogyContent = textBlock.text;
-			}
-		}
-		
-		if (!rawGenealogyContent && llmJson.content?.[0]?.text) {
-		    rawGenealogyContent = llmJson.content?.[0]?.text;
-		}
-		
-		if (!rawGenealogyContent) {
-		    console.error("Error extracting content from LLM response:", JSON.stringify(llmJson, null, 2));
-		    rawGenealogyContent = '<genealogy>Error: Could not extract content from LLM response.</genealogy>';
-		}
+				if (!llmRes.ok) {
+					const errorBody = await llmRes.text();
+					console.error(`Anthropic API Error (${llmRes.status}): ${errorBody}`);
+					return new Response(`Error from AI service: ${llmRes.statusText}. Details: ${errorBody}`, { 
+						status: llmRes.status, 
+						headers: { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' } 
+					});
+				}
 
-		const genealogy_items: { title: string; year: string; url: string; claim: string }[] = [];
-		let critique_of_genealogy = 'Not identified';
-		const open_questions: string[] = [];
-
-		const genealogyMatch = rawGenealogyContent.match(/<genealogy>([\s\S]*?)<\/genealogy>/);
-
-		if (genealogyMatch && genealogyMatch[1]) {
-			const content = genealogyMatch[1].trim();
-			const lines = content.split('\n');
-			const itemRegex = /^(.*?)\s\((.*?)\)\s\[\[(.*?)\]\]\s—\s(.*?)$/;
-			let readingOpenQuestions = false;
-
-			for (const line of lines) {
-				if (line.startsWith('Critique of Genealogy / Methodological Blind Spots:')) {
-					critique_of_genealogy = line.substring('Critique of Genealogy / Methodological Blind Spots:'.length).trim();
-					readingOpenQuestions = false; // Stop reading open questions if we encounter this line again
-				} else if (line.startsWith('Open Questions:')) {
-					readingOpenQuestions = true;
-				} else if (readingOpenQuestions && line.startsWith('- ')) {
-					open_questions.push(line.substring(2).trim());
-				} else if (!readingOpenQuestions) {
-					const match = line.match(itemRegex);
-					if (match) {
-						genealogy_items.push({
-							title: match[1].trim(),
-							year: match[2].trim(),
-							url: match[3].trim(),
-							claim: match[4].trim(),
-						});
+				const llmJson = (await llmRes.json()) as any;
+				
+				let rawGenealogyContent = '';
+				if (llmJson.content && Array.isArray(llmJson.content) && llmJson.content.length > 0) {
+					const textBlock = llmJson.content.find((block: any) => block.type === 'text');
+					if (textBlock && textBlock.text) {
+						rawGenealogyContent = textBlock.text;
+					} else if (llmJson.content[0].type === 'text' && llmJson.content[0].text) {
+						 // Fallback for slightly different structures if the first block is text
+						 rawGenealogyContent = llmJson.content[0].text;
 					}
 				}
+
+				if (!rawGenealogyContent) {
+						console.error("Error extracting content from LLM response:", JSON.stringify(llmJson, null, 2));
+						return new Response("Error: Could not extract content from LLM response.", { 
+							status: 500, 
+							headers: { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' } 
+						});
+				}
+				
+				// Extract content within <genealogy> tags
+				const genealogyMatch = rawGenealogyContent.match(/<genealogy>([\s\S]*?)<\/genealogy>/);
+				const finalContent = genealogyMatch && genealogyMatch[1] ? genealogyMatch[1].trim() : rawGenealogyContent.trim();
+
+				return new Response(finalContent, {
+					headers: { 
+						'Content-Type': 'text/plain; charset=utf-8',
+						'Access-Control-Allow-Origin': '*' 
+					},
+				});
+
+			} catch (e: any) {
+				console.error('Worker error during /trace:', e);
+				return new Response(JSON.stringify({ error: "Worker processing error", details: e.message }), {
+					status: 500,
+					headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+				});
 			}
 		}
 
-		// Basic fallback if parsing fails for some reason but there was content
-		if (genealogy_items.length === 0 && !critique_of_genealogy.startsWith('Not identified') && open_questions.length === 0 && rawGenealogyContent) {
-			// This condition might need refinement. 
-			// If everything is empty despite raw content, it indicates a major parsing failure.
-			// Consider setting a specific error message or logging.
-			critique_of_genealogy = "Failed to parse structured content from LLM."; 
+		if (url.pathname === '/') {
+			return new Response('Genealogy AI Trace Worker is running. Use the /trace endpoint with POST.', {
+				headers: { 'Content-Type': 'text/plain' },
+			});
 		}
 
-		return new Response(JSON.stringify({ genealogy_items, critique_of_genealogy, open_questions }), {
-			headers: {
-				'Content-Type': 'application/json',
-				'Access-Control-Allow-Origin': '*',
-			},
-		});
+		return new Response('Not found. Use /trace with POST or visit the root /.', { status: 404 });
 	},
 } satisfies ExportedHandler<Env>;
