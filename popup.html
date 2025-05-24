@@ -32,7 +32,7 @@
       padding-bottom: 5px;
       color: #2d3748;
     }
-    #trace-output .trace-item, #critique-section p, #questions-section ul {
+    #trace-output .trace-item, #questions-section ul {
       background-color: #fff;
       padding: 12px;
       border: 1px solid #e2e8f0;
@@ -76,6 +76,35 @@
     .trace-this-button:hover {
       background-color: #e2e8f0;
     }
+    .copy-all-button {
+      background-color: #38a169;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .copy-all-button:hover {
+      background-color: #2f855a;
+    }
+    .copy-all-container {
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+    }
+    .cache-indicator {
+      background-color: #f0fff4;
+      color: #22543d;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-bottom: 10px;
+      border: 1px solid #c6f6d5;
+      font-weight: 500;
+    }
     #questions-list {
       list-style-type: disc;
       padding-left: 20px;
@@ -118,10 +147,6 @@
   <div id="results-container" style="display:none;">
     <div id="trace-output">
       <!-- Trace items will be dynamically inserted here -->
-    </div>
-    <div id="critique-section" style="display:none;">
-      <h2>Critique & Blind Spots</h2>
-      <p id="critique-text"></p>
     </div>
     <div id="questions-section" style="display:none;">
       <h2>Open Questions</h2>

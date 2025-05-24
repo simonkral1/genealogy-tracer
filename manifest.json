@@ -1,10 +1,21 @@
 {
-  
   "manifest_version": 3,
   "name": "Genealogy Tracer",
   "version": "1.0",
-  "description": "Traces the genealogy of concepts.",
-  "permissions": ["activeTab", "scripting", "notifications"],
+  "description": "Trace the genealogy of selected text using AI",
+  "permissions": [
+    "activeTab",
+    "notifications",
+    "windows",
+    "contextMenus",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -12,14 +23,26 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html",
+    "default_title": "Genealogy Tracer",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
-  "background": {
-    "service_worker": "background.js"
-  }
+  "commands": {
+    "trace-selected": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+G",
+        "mac": "Command+Shift+G"
+      },
+      "description": "Trace genealogy of selected text"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

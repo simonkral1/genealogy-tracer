@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
   const resultsContainer = document.getElementById('results-container');
   const traceOutputDiv = document.getElementById('trace-output');
-  const critiqueSectionDiv = document.getElementById('critique-section');
-  const critiqueTextP = document.getElementById('critique-text');
   const questionsSectionDiv = document.getElementById('questions-section');
   const questionsListUl = document.getElementById('questions-list');
   const loadingStateDiv = document.getElementById('loading-state');
@@ -23,59 +21,76 @@ document.addEventListener('DOMContentLoaded', function () {
     errorStateP.textContent = "Error: " + message;
   }
 
-  function displayData(traceData) {
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      // Show brief feedback
+      const originalText = event.target.textContent;
+      event.target.textContent = 'Copied!';
+      event.target.style.backgroundColor = '#48bb78';
+      setTimeout(() => {
+        event.target.textContent = originalText;
+        event.target.style.backgroundColor = '';
+      }, 1000);
+    }).catch(err => {
+      console.error('Failed to copy: ', err);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    });
+  }
+
+  function displayData(traceData, fromCache = false) {
     traceOutputDiv.innerHTML = ''; // Clear previous items
-    critiqueTextP.textContent = ''; // Clear previous
     questionsListUl.innerHTML = ''; // Clear previous questions
 
     loadingStateDiv.style.display = 'none';
     errorStateDiv.style.display = 'none';
     resultsContainer.style.display = 'block';
     
+    // Add cache indicator if from cache
+    if (fromCache) {
+      const cacheIndicator = document.createElement('div');
+      cacheIndicator.className = 'cache-indicator';
+      cacheIndicator.innerHTML = '⚡ Loaded from cache (instant!)';
+      traceOutputDiv.appendChild(cacheIndicator);
+    }
+    
     // Default to hiding sections, they will be shown if content is present
     traceOutputDiv.style.display = 'none';
-    critiqueSectionDiv.style.display = 'none';
     questionsSectionDiv.style.display = 'none';
 
     const lines = traceData.split('\n');
-    let readingCritique = false;
     let readingQuestions = false;
     const itemRegex = /^(.*?)\s\((.*?)\)\s\[\[(.*?)\]\]\s—\s(.*?)$/;
     let hasGenealogyItems = false;
+    let allTraceText = '';
 
     lines.forEach(line => {
       line = line.trim();
       if (!line) return;
 
-      if (line.toLowerCase().startsWith('critique of genealogy / methodological blind spots:')) {
-        const critiqueContent = line.substring(line.indexOf(':') + 1).trim();
-        if (critiqueContent) {
-            critiqueTextP.textContent = critiqueContent;
-            critiqueSectionDiv.style.display = 'block';
-        }
-        readingCritique = true;
-        readingQuestions = false;
+      // Skip timing breakdown section and everything after it
+      if (line.startsWith('--- TIMING BREAKDOWN ---')) {
+        readingQuestions = false; // Stop reading questions too
         return;
       }
+
       if (line.toLowerCase().startsWith('open questions:')) {
-        readingCritique = false;
         readingQuestions = true;
+        allTraceText += line + '\n';
         // No need to display the section yet, only if there are actual questions
         return;
       }
 
-      if (readingCritique && !readingQuestions) {
-        // Append to critique if it spans multiple lines
-        if (critiqueTextP.textContent) critiqueTextP.textContent += '\n' + line;
-        else critiqueTextP.textContent = line;
-        if (critiqueTextP.textContent) critiqueSectionDiv.style.display = 'block';
-        return;
-      }
-      
       if (readingQuestions) {
         if (line.startsWith('-')) {
           const questionText = line.substring(1).trim();
           if (questionText) {
+            allTraceText += '- ' + questionText + '\n';
             const li = document.createElement('li');
             li.textContent = questionText;
             questionsListUl.appendChild(li);
@@ -90,6 +105,10 @@ document.addEventListener('DOMContentLoaded', function () {
         hasGenealogyItems = true;
         traceOutputDiv.style.display = 'block';
         const [, title, year, url, claim] = match;
+        
+        // Add to full text for copying
+        allTraceText += `${title} (${year}) [${url}] — ${claim}\n`;
+        
         const itemDiv = document.createElement('div');
         itemDiv.className = 'trace-item';
         
@@ -129,16 +148,30 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
 
+    // Add single copy all button if we have content
+    if (hasGenealogyItems || questionsSectionDiv.style.display !== 'none') {
+      const copyAllContainer = document.createElement('div');
+      copyAllContainer.className = 'copy-all-container';
+      
+      const copyAllBtn = document.createElement('button');
+      copyAllBtn.textContent = 'Copy All';
+      copyAllBtn.className = 'copy-all-button';
+      copyAllBtn.addEventListener('click', () => copyToClipboard(allTraceText));
+      copyAllContainer.appendChild(copyAllBtn);
+      
+      traceOutputDiv.appendChild(copyAllContainer);
+    }
+
     if (!hasGenealogyItems && traceOutputDiv.style.display !== 'none') {
         // If we thought we had items but didn't parse any, hide or show message
-        if (critiqueSectionDiv.style.display === 'none' && questionsSectionDiv.style.display === 'none') {
+        if (questionsSectionDiv.style.display === 'none') {
              traceOutputDiv.innerHTML = '<p>No genealogy items found in the trace.</p>';
              traceOutputDiv.style.display = 'block';
         } else {
             traceOutputDiv.style.display = 'none';
         }
     }
-    if (traceOutputDiv.children.length === 0 && critiqueSectionDiv.style.display === 'none' && questionsSectionDiv.style.display === 'none'){
+    if (traceOutputDiv.children.length === 0 && questionsSectionDiv.style.display === 'none'){
         // If absolutely nothing was parsed or displayed from the trace data
         showError("Could not parse a valid trace from the response.");
     }
@@ -157,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
           if (response.error) {
             showError(response.error);
           } else if (response.trace) {
-            displayData(response.trace);
+            displayData(response.trace, response.fromCache);
           } else {
             showError("Unexpected response for new trace.");
           }
@@ -176,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (response.error) {
         showError(response.error);
       } else if (response.trace) {
-        displayData(response.trace);
+        displayData(response.trace, response.fromCache);
       } else {
         showError("Received an unexpected response from background script.");
       }
