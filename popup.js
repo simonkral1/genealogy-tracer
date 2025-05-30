@@ -208,6 +208,12 @@ document.addEventListener('DOMContentLoaded', function () {
       copyAllBtn.className = 'copy-all-button';
       copyAllBtn.addEventListener('click', () => copyToClipboard(allTraceText));
       copyAllContainer.appendChild(copyAllBtn);
+
+      const graphViewBtn = document.createElement('button');
+      graphViewBtn.textContent = 'Graph View';
+      graphViewBtn.className = 'graph-view-button';
+      graphViewBtn.addEventListener('click', () => openGraphView());
+      copyAllContainer.appendChild(graphViewBtn);
       
       traceOutputDiv.appendChild(copyAllContainer);
 
@@ -220,6 +226,96 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   let currentTraceText = null;
+  let graphViewWindowId = null;
+
+  function openGraphView() {
+    // Use streaming data if available, otherwise use cached data
+    const items = streamedItems.length > 0 ? streamedItems : parseCachedItems();
+    const questions = streamedQuestions.length > 0 ? streamedQuestions : parseCachedQuestions();
+    
+    const graphData = {
+      nodes: [],
+      links: [],
+      rootTerm: currentTraceText,
+      items: items,
+      questions: questions
+    };
+
+    console.log('Preparing graph data:', graphData);
+    console.log('Current trace text:', currentTraceText);
+    console.log('Streamed items:', streamedItems);
+    console.log('Parsed items:', items);
+
+    // Store graph data for the new popup
+    chrome.storage.local.set({ 
+      'graphViewData': graphData,
+      'graphViewTimestamp': Date.now()
+    }).then(() => {
+      console.log('Graph data stored successfully');
+      // Verify storage
+      chrome.storage.local.get(['graphViewData']).then(result => {
+        console.log('Verified stored data:', result);
+      });
+      
+      // Close previous graph view window if it exists
+      if (graphViewWindowId) {
+        chrome.windows.remove(graphViewWindowId).catch(error => {
+          console.log('Previous graph window already closed or not found:', error);
+        });
+      }
+      
+      // Open graph view popup
+      chrome.windows.create({
+        url: chrome.runtime.getURL('graph-view.html'),
+        type: 'popup',
+        width: 900,
+        height: 700,
+        focused: true
+      }).then(window => {
+        // Store the new window ID
+        graphViewWindowId = window.id;
+        console.log('Graph view window opened with ID:', graphViewWindowId);
+      });
+    }).catch(error => {
+      console.error('Failed to store graph data:', error);
+    });
+  }
+
+  function parseCachedItems() {
+    // Parse genealogy items from the current UI
+    const items = [];
+    const traceItems = document.querySelectorAll('.trace-item');
+    
+    traceItems.forEach(itemDiv => {
+      const strong = itemDiv.querySelector('strong');
+      const spans = itemDiv.querySelectorAll('span');
+      const link = itemDiv.querySelector('a');
+      
+      if (strong && spans.length >= 2) {
+        const title = strong.textContent;
+        const yearText = spans[0].textContent.trim();
+        const year = yearText.match(/\(([^)]+)\)/) ? yearText.match(/\(([^)]+)\)/)[1] : '';
+        const claim = spans[spans.length - 1].textContent.replace(/^—\s*/, '');
+        const url = link ? link.href : 'N/A';
+        
+        items.push({ title, year, claim, url });
+      }
+    });
+    
+    return items;
+  }
+
+  function parseCachedQuestions() {
+    // Parse questions from the current UI
+    const questions = [];
+    const questionItems = document.querySelectorAll('#questions-list li');
+    
+    questionItems.forEach(li => {
+      questions.push(li.textContent);
+    });
+    
+    return questions;
+  }
 
   async function performDirectTrace(selectedText) {
     currentTraceText = selectedText;
@@ -338,8 +434,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const lines = traceData.split('\n');
     let readingQuestions = false;
-    // Updated regex to match the format: "Title (Year) [URL] — Claim"
-    const itemRegex = /^(.*?)\s\(([^)]+)\)\s\[([^\]]+)\]\s—\s(.+)$/;
+    // Updated regex to match the format: "Title (Year) [[URL]] — Claim"
+    const itemRegex = /^(.*?)\s\(([^)]+)\)\s\[\[([^\]]+)\]\]\s—\s(.+)$/;
     let hasGenealogyItems = false;
     let allTraceText = '';
 
@@ -432,6 +528,12 @@ document.addEventListener('DOMContentLoaded', function () {
       copyAllBtn.className = 'copy-all-button';
       copyAllBtn.addEventListener('click', () => copyToClipboard(allTraceText));
       copyAllContainer.appendChild(copyAllBtn);
+
+      const graphViewBtn = document.createElement('button');
+      graphViewBtn.textContent = 'Graph View';
+      graphViewBtn.className = 'graph-view-button';
+      graphViewBtn.addEventListener('click', () => openGraphView());
+      copyAllContainer.appendChild(graphViewBtn);
       
       traceOutputDiv.appendChild(copyAllContainer);
     }
@@ -451,6 +553,10 @@ document.addEventListener('DOMContentLoaded', function () {
       if (response.error) {
         showError(response.error);
       } else if (response.trace) {
+        // Set currentTraceText from response if available
+        if (response.selectedText) {
+          currentTraceText = response.selectedText;
+        }
         displayData(response.trace, response.fromCache);
       } else if (response.selectedText) {
         // Direct streaming with selected text

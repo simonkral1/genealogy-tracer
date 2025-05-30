@@ -188,7 +188,7 @@ async function performTrace(selectedText, sendResponse) {
     // Check cache first
     const cachedResponse = await getCachedResponse(selectedText);
     if (cachedResponse) {
-      sendResponse({ trace: cachedResponse, fromCache: true });
+      sendResponse({ trace: cachedResponse, fromCache: true, selectedText: selectedText });
       return;
     }
     

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Graph Test</title>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 20px;
+      background-color: #f4f6f8;
+    }
+    
+    .test-controls {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    button {
+      background-color: #4299e1;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    
+    button:hover {
+      background-color: #3182ce;
+    }
+    
+    #graph-container {
+      width: 100%;
+      height: 600px;
+      background-color: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      position: relative;
+    }
+    
+    .loading, .error {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      padding: 20px;
+      border-radius: 6px;
+    }
+    
+    .loading {
+      color: #4a5568;
+      background-color: #f0f4f8;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .error {
+      color: #c53030;
+      background-color: #fed7d7;
+      border: 1px solid #fbb6b6;
+      font-weight: 500;
+    }
+    
+    .node {
+      cursor: pointer;
+      stroke: #333;
+      stroke-width: 1.5px;
+    }
+    
+    .node.root {
+      fill: #4299e1;
+      stroke: #2b6cb0;
+      stroke-width: 3px;
+    }
+    
+    .node.genealogy {
+      fill: #48bb78;
+      stroke: #2f855a;
+    }
+    
+    .node.question {
+      fill: #ed8936;
+      stroke: #c05621;
+    }
+    
+    .link {
+      stroke: #999;
+      stroke-opacity: 0.6;
+      stroke-width: 2px;
+    }
+    
+    .node-label {
+      font-size: 12px;
+      font-weight: 500;
+      text-anchor: middle;
+      pointer-events: none;
+      fill: #333;
+    }
+    
+    .tooltip {
+      position: absolute;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1000;
+      max-width: 300px;
+      word-wrap: break-word;
+    }
+    
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      background: #e6fffa;
+      border: 1px solid #81e6d9;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-controls">
+    <h2>Graph Visualization Test</h2>
+    <button onclick="loadTestData()">Load Test Data</button>
+    <button onclick="clearGraph()">Clear Graph</button>
+    <button onclick="testD3()">Test D3</button>
+    <div id="status" class="status">Ready to test...</div>
+  </div>
+  
+  <div id="graph-container">
+    <div id="loading-state" class="loading" style="display:none;">
+      <p>Loading graph visualization...</p>
+    </div>
+    <div id="error-state" class="error" style="display:none;">
+      <p>Failed to load graph data.</p>
+    </div>
+  </div>
+  
+  <div id="tooltip" class="tooltip"></div>
+  
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    // Mock chrome storage for testing
+    window.chrome = {
+      storage: {
+        local: {
+          get: function(keys) {
+            return Promise.resolve({
+              graphViewData: window.testGraphData || null
+            });
+          }
+        }
+      }
+    };
+    
+    function updateStatus(message) {
+      document.getElementById('status').textContent = new Date().toLocaleTimeString() + ': ' + message;
+    }
+    
+    function testD3() {
+      if (typeof d3 !== 'undefined') {
+        updateStatus('D3.js v' + d3.version + ' is loaded successfully');
+      } else {
+        updateStatus('ERROR: D3.js is not loaded');
+      }
+    }
+    
+    function loadTestData() {
+      updateStatus('Loading test data...');
+      
+      // Create sample test data
+      window.testGraphData = {
+        rootTerm: "Machine Learning",
+        items: [
+          {
+            title: "Artificial Intelligence",
+            year: "1956",
+            claim: "The field that encompasses machine learning as a subset",
+            url: "https://en.wikipedia.org/wiki/Artificial_intelligence"
+          },
+          {
+            title: "Neural Networks",
+            year: "1943",
+            claim: "Mathematical models inspired by biological neural networks",
+            url: "https://en.wikipedia.org/wiki/Neural_network"
+          },
+          {
+            title: "Deep Learning",
+            year: "2006",
+            claim: "Machine learning using deep neural networks",
+            url: "https://en.wikipedia.org/wiki/Deep_learning"
+          }
+        ],
+        questions: [
+          "How does machine learning relate to human cognition?",
+          "What are the ethical implications of AI systems?",
+          "How can we ensure AI safety and alignment?"
+        ]
+      };
+      
+      updateStatus('Test data loaded, initializing graph...');
+      
+      // Wait a bit then initialize
+      setTimeout(() => {
+        if (window.initializeGraphTest) {
+          window.initializeGraphTest();
+        } else {
+          updateStatus('ERROR: Graph initialization function not found');
+        }
+      }, 100);
+    }
+    
+    function clearGraph() {
+      d3.select('#graph-container svg').remove();
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('error-state').style.display = 'none';
+      updateStatus('Graph cleared');
+    }
+    
+    // Wait for D3 to load then load our script
+    function waitForD3() {
+      if (typeof d3 !== 'undefined') {
+        updateStatus('D3.js loaded, loading graph script...');
+        const script = document.createElement('script');
+        script.src = 'graph-view-test.js';
+        script.onload = () => updateStatus('Graph script loaded successfully');
+        script.onerror = () => updateStatus('ERROR: Failed to load graph script');
+        document.head.appendChild(script);
+      } else {
+        setTimeout(waitForD3, 100);
+      }
+    }
+    
+    // Start loading
+    updateStatus('Waiting for D3.js to load...');
+    waitForD3();
+  </script>
+</body>
+</html>

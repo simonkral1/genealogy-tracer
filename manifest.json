@@ -41,7 +41,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["popup.html"],
+      "resources": ["popup.html", "graph-view.html", "graph-view.js", "d3.v7.min.js"],
       "matches": ["<all_urls>"]
     }
   ]
