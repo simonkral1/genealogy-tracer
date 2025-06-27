@@ -142,6 +142,12 @@ document.addEventListener('DOMContentLoaded', function () {
     loadingStateDiv.style.display = 'none';
     errorStateDiv.style.display = 'block';
     
+    // Hide search term display on error
+    const searchTermDisplay = document.getElementById('search-term-display');
+    if (searchTermDisplay) {
+      searchTermDisplay.style.display = 'none';
+    }
+    
     // Enhanced error messages with user-friendly text
     const friendlyErrors = {
       'Failed to fetch': 'Unable to connect to the service. Please check your internet connection.',
@@ -568,6 +574,14 @@ document.addEventListener('DOMContentLoaded', function () {
     currentTraceText = selectedText;
     console.log('Starting trace for:', selectedText);
     
+    // Show search term
+    const searchTermDisplay = document.getElementById('search-term-display');
+    const searchTermText = document.getElementById('search-term-text');
+    if (searchTermDisplay && searchTermText) {
+      searchTermText.textContent = `Tracing genealogy of: ${selectedText}`;
+      searchTermDisplay.style.display = 'block';
+    }
+    
     // Check cache first
     const cachedResponse = await getCachedResponse(selectedText);
     if (cachedResponse) {
@@ -677,6 +691,14 @@ document.addEventListener('DOMContentLoaded', function () {
     loadingStateDiv.style.display = 'none';
     errorStateDiv.style.display = 'none';
     resultsContainer.style.display = 'block';
+    
+    // Show search term display if we have currentTraceText
+    const searchTermDisplay = document.getElementById('search-term-display');
+    const searchTermText = document.getElementById('search-term-text');
+    if (searchTermDisplay && searchTermText && currentTraceText) {
+      searchTermText.textContent = `Tracing genealogy of: ${currentTraceText}`;
+      searchTermDisplay.style.display = 'block';
+    }
     
     if (fromCache) {
       const cacheIndicator = document.createElement('div');
