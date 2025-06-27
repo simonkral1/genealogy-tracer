@@ -1,4 +1,4 @@
-# Concept Tracer - A Browser Extension for Intellectual Archaeology
+# Concept Tracer - A Browser Extension for Intellectual Genealogy
 
 <p align="center">
   <img src="icons/logo_final.png" alt="Concept Tracer Logo" width="200"/>
