@@ -10,6 +10,17 @@ Many thinkers have problematized truth, and dogmatic claims to "truth" have ofte
 
 **Concept Tracer** is the operationalization of Nietzsche's genealogical method for the digital age - a browser extension that uses AI as a partner in truth-seeking, not an oracle of it.
 
+## 📥 Download & Install
+
+**[⬇️ Download Concept Tracer Extension](./concept-tracer-extension.zip)**
+
+### Quick Install:
+1. Download the extension file above
+2. Go to `chrome://extensions/` in Chrome
+3. Enable "Developer mode" (top right toggle)
+4. Click "Load unpacked" and select the downloaded folder
+5. Start tracing concepts on any webpage!
+
 ## What It Does
 
 Select any word or phrase on a webpage and instantly examine its intellectual history. Instead of flat definitions, Concept Tracer reveals a concept's genealogy: the story of its emergence, mutations, and the intellectual battles that have shaped it.
@@ -31,7 +42,7 @@ Select any word or phrase on a webpage and instantly examine its intellectual hi
 ## 🚀 How to Use
 
 1. **Install the Extension**
-   - Download `concept-tracer-extension.zip` from the releases
+   - Download `concept-tracer-extension.zip` from the [download link above](#-download--install)
    - Go to `chrome://extensions/` in Chrome
    - Enable "Developer mode" (top right toggle)
    - Click "Load unpacked" and select the unzipped folder
