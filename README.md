@@ -22,7 +22,7 @@ Select any word or phrase on a webpage and instantly examine its intellectual hi
 
 - **Instant Genealogies**: Trace any concept's intellectual history in seconds
 - **Non-Intrusive Interface**: Minimalist popup that sits alongside your reading, like a genealogical interactive Wikipedia
-- **Deep Exploration**: Every result can be traced further, creating chains of intellectual investigation
+- **Recursive Exploration**: Every result can be traced further, creating chains of intellectual investigation
 - **Expand Function**: Get detailed analysis of any genealogical entry with a single click
 - **Smart Caching**: Previously traced concepts load instantly from your personal archive
 - **Open Questions**: Each trace reveals unresolved debates and gaps in knowledge
