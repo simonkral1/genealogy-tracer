@@ -30,6 +30,14 @@
       text-transform: uppercase;
       border-bottom: 1px solid #d0d0d0;
       padding-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
     }
     h2 {
       font-size: 13px;
@@ -316,7 +324,10 @@
   </style>
 </head>
 <body>
-  <h1>Genealogy Tracer</h1>
+  <h1>
+    <img src="icons/icon48.png" alt="Genealogy Tracer" class="logo">
+    Genealogy Tracer
+  </h1>
   
   <div id="search-term-display" style="display:none; margin-bottom: 16px; padding: 12px; background: #f8f8f8; border: 1px solid #e0e0e0; font-style: italic; color: #555555;">
     <span id="search-term-text"></span>

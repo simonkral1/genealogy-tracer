@@ -1,6 +1,32 @@
-# Genealogy Tracer - Chrome Extension
+# Genealogy Tracer - A Browser Extension for Intellectual Archaeology
 
-A Chrome extension that traces the intellectual genealogy of concepts and ideas using AI. Select any text on a webpage and instantly discover its origins, related concepts, evolution, and open questions.
+<p align="center">
+  <img src="icons/logo_final.png" alt="Genealogy Tracer Logo" width="200"/>
+</p>
+
+## Truth is a Slippery Idea
+
+Many thinkers have problematized truth, and dogmatic claims to "truth" have often served as roadblocks for thought. Nietzsche developed a powerful response: the genealogical method. This is not a search for static facts, but a historical uncovering of the origins, contingencies, and power struggles behind the concepts we use unconsciously.
+
+**Genealogy Tracer** is the operationalization of Nietzsche's genealogical method for the digital age - a browser extension that uses AI as a partner in truth-seeking, not an oracle of it.
+
+## What It Does
+
+Select any word or phrase on a webpage and instantly examine its intellectual history. Instead of flat definitions, Genealogy Tracer reveals a concept's genealogy: the story of its emergence, mutations, and the intellectual battles that have shaped it.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/genealogy-demo.gif" alt="Genealogy Tracer Demo" width="600"/>
+</p>
+
+### Features
+
+- **Instant Genealogies**: Trace any concept's intellectual history in seconds
+- **Non-Intrusive Interface**: Minimalist popup that sits alongside your reading, like a genealogical interactive Wikipedia
+- **Deep Exploration**: Every result can be traced further, creating chains of intellectual investigation
+- **Expand Function**: Get detailed analysis of any genealogical entry with a single click
+- **Smart Caching**: Previously traced concepts load instantly from your personal archive
+- **Open Questions**: Each trace reveals unresolved debates and gaps in knowledge
+- **Export Research**: Copy formatted results for your notes and further study
 
 ## 🚀 How to Use
 
@@ -17,49 +43,43 @@ A Chrome extension that traces the intellectual genealogy of concepts and ideas 
 
 3. **Explore Results**
    - View the intellectual genealogy with sources and years
-   - Click "Trace this" on any result to dive deeper
+   - Click "trace" on any result to dive deeper
+   - Click "expand" for detailed analysis of specific entries
    - Use "Copy All" to save your research
    - Explore open questions for further investigation
 
-## ✨ Features
-
-- **Instant Results**: AI-powered genealogy tracing in seconds
-- **Smart Caching**: Previously traced concepts load instantly
-- **Deep Exploration**: Trace related concepts with one click
-- **Source Links**: Direct links to original sources when available
-- **Research Export**: Copy formatted results for your notes
-- **Open Questions**: Discover gaps in knowledge to explore further
-
 ## 🎯 Perfect For
 
-- **Students** researching essay topics
+- **Students** researching essay topics with historical depth
 - **Academics** exploring intellectual history
-- **Writers** understanding concept origins
-- **Curious minds** wanting to understand ideas deeply
+- **Writers** understanding the genealogical weight of their words
+- **Anyone** who believes the important question is not "What is the truth?" but "How did this come to be seen as true?"
 
 ## 🔧 Technical Details
 
-The extension connects to a Cloudflare Worker that processes your queries using advanced AI models to trace intellectual genealogies across history.
+The extension uses AI to generate structured genealogies of concepts, presenting them through a minimalist interface inspired by library card catalogs. Results stream in real-time as the AI traces through intellectual history.
 
-**Privacy**: Your selections are only sent to our secure processing endpoint. No data is stored permanently.
+**Privacy**: Your selections are processed securely. Results are cached locally in your browser for 24 hours. No permanent storage of your queries.
 
 ## 📦 Installation from Source
-
-If you want to install from source code:
 
 ```bash
 # Clone this repository
 git clone https://github.com/your-username/genealogy-ai.git
 cd genealogy-ai
 
-# Extension files are ready in the dist/ folder
-# Follow the installation steps above using the dist/ folder
+# The extension files are in the root directory
+# Follow the installation steps above using this directory
 ```
 
 ## 🤝 Contributing
 
-Contributions welcome! See the technical documentation in the `trace-worker/` directory for backend details.
+We welcome contributions! The project aims to make genealogical thinking accessible in the digital age.
 
 ## 📄 License
 
-MIT License - See LICENSE file for details 
+MIT License - See LICENSE file for details
+
+---
+
+*"The most important question is not 'What is the truth?' but 'How did this come to be seen as true?'"* 
