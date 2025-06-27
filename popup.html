@@ -24,7 +24,7 @@
       font-size: 16px;
       font-weight: normal;
       margin: 0 0 20px 0;
-      color: #2c2c2c;
+      color: #000000;
       text-align: left;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -38,7 +38,7 @@
       margin-bottom: 12px;
       border-bottom: 1px solid #d0d0d0;
       padding-bottom: 6px;
-      color: #2c2c2c;
+      color: #000000;
       letter-spacing: 1px;
       text-transform: uppercase;
     }
@@ -86,14 +86,14 @@
       transform: translateY(-50%);
       width: 6px;
       height: 6px;
-      background: #666;
+      background: #666666;
       border-radius: 50%;
       z-index: 2;
     }
     
     .timeline-year {
       font-size: 8px;
-      color: #666;
+      color: #666666;
       font-weight: bold;
       margin-left: 30%;
       white-space: nowrap;
@@ -125,18 +125,19 @@
         display: block; /* Each part on its own line initially */
     }
     .trace-item strong {
-        color: #2c5282; /* Darker blue for title */
+        color: #000000; /* Changed from blue to black */
     }
     .trace-item span {
         margin-right: 5px;
     }
     .trace-item a {
-      color: #3182ce;
+      color: #666666; /* Changed from blue to grey */
       text-decoration: none;
       font-weight: 500;
     }
     .trace-item a:hover {
       text-decoration: underline;
+      color: #000000; /* Black on hover */
     }
     .item-buttons {
       display: flex;
@@ -146,8 +147,8 @@
     
     .trace-this-button, .expand-button {
       background: #ffffff;
-      color: #555;
-      border: 1px solid #ccc;
+      color: #555555;
+      border: 1px solid #cccccc;
       padding: 4px 8px;
       font-size: 10px;
       font-family: 'Courier New', Courier, monospace;
@@ -157,12 +158,12 @@
     }
     .trace-this-button:hover, .expand-button:hover {
       background: #f5f5f5;
-      border-color: #999;
+      border-color: #999999;
     }
     
     .expand-button:disabled {
       background: #f8f8f8;
-      color: #ccc;
+      color: #cccccc;
       cursor: not-allowed;
       border-color: #e0e0e0;
     }
@@ -181,8 +182,8 @@
     }
     .copy-all-button {
       background: #ffffff;
-      color: #555;
-      border: 1px solid #ccc;
+      color: #555555;
+      border: 1px solid #cccccc;
       padding: 8px 16px;
       font-size: 11px;
       font-family: 'Courier New', Courier, monospace;
@@ -192,7 +193,7 @@
     }
     .copy-all-button:hover {
       background: #f5f5f5;
-      border-color: #999;
+      border-color: #999999;
     }
     .copy-all-container {
       margin-top: 16px;
@@ -202,9 +203,9 @@
     }
     .cache-indicator {
       background: #f8f8f8;
-      color: #666;
+      color: #666666;
       padding: 6px 10px;
-      border: 1px solid #ddd;
+      border: 1px solid #dddddd;
       font-size: 11px;
       margin-bottom: 12px;
       font-style: italic;
@@ -223,15 +224,15 @@
     #questions-list li {
       margin-bottom: 6px;
       padding: 6px 0;
-      border-bottom: 1px dotted #ccc;
-      color: #666;
+      border-bottom: 1px dotted #cccccc;
+      color: #666666;
       font-style: italic;
       word-wrap: break-word;
       overflow-wrap: break-word;
     }
     #questions-list li::before {
       content: '• ';
-      color: #999;
+      color: #999999;
       font-style: normal;
     }
     
@@ -256,7 +257,7 @@
     
     .toggle-icon {
       font-size: 12px;
-      color: #666;
+      color: #666666;
       transition: transform 0.2s ease;
       font-family: 'Courier New', Courier, monospace;
     }
@@ -288,12 +289,12 @@
         font-style: italic;
     }
     .loading {
-      color: #555;
+      color: #555555;
     }
     .error {
-      color: #8b0000;
-      background: #fff5f5;
-      border-color: #ffcccc;
+      color: #000000; /* Changed from red to black */
+      background: #f5f5f5; /* Changed from red background to light grey */
+      border-color: #cccccc; /* Changed from red border to grey */
     }
     
     .loading-dots {
@@ -308,7 +309,7 @@
     
     .progress-indicator {
       margin-top: 8px;
-      color: #777;
+      color: #777777;
       font-size: 11px;
       letter-spacing: 1px;
     }
@@ -317,7 +318,7 @@
 <body>
   <h1>Genealogy Tracer</h1>
   
-  <div id="search-term-display" style="display:none; margin-bottom: 16px; padding: 12px; background: #f8f8f8; border: 1px solid #e0e0e0; font-style: italic; color: #555;">
+  <div id="search-term-display" style="display:none; margin-bottom: 16px; padding: 12px; background: #f8f8f8; border: 1px solid #e0e0e0; font-style: italic; color: #555555;">
     <span id="search-term-text"></span>
   </div>
   

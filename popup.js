@@ -322,10 +322,12 @@ document.addEventListener('DOMContentLoaded', function () {
     navigator.clipboard.writeText(text).then(() => {
       const originalText = event.target.textContent;
       event.target.textContent = 'Copied!';
-      event.target.style.backgroundColor = '#48bb78';
+      event.target.style.backgroundColor = '#888888'; // Changed from green to grey
+      event.target.style.color = '#ffffff'; // White text on grey background
       setTimeout(() => {
         event.target.textContent = originalText;
         event.target.style.backgroundColor = '';
+        event.target.style.color = '';
       }, 1000);
     }).catch(err => {
       console.error('Failed to copy: ', err);
@@ -816,6 +818,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!hasGenealogyItems && questionsSectionDiv.style.display === 'none') {
       showError("Could not parse a valid trace from the response.");
     }
+    
+    // Initialize collapsible elements for cached results
+    initializeCollapsibleElements();
   }
 
   showLoading('Retrieving selected passage');
