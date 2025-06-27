@@ -1,21 +1,21 @@
-# Genealogy Tracer - A Browser Extension for Intellectual Archaeology
+# Concept Tracer - A Browser Extension for Intellectual Archaeology
 
 <p align="center">
-  <img src="icons/logo_final.png" alt="Genealogy Tracer Logo" width="200"/>
+  <img src="icons/logo_final.png" alt="Concept Tracer Logo" width="200"/>
 </p>
 
 ## Truth is a Slippery Idea
 
 Many thinkers have problematized truth, and dogmatic claims to "truth" have often served as roadblocks for thought. Nietzsche developed a powerful response: the genealogical method. This is not a search for static facts, but a historical uncovering of the origins, contingencies, and power struggles behind the concepts we use unconsciously.
 
-**Genealogy Tracer** is the operationalization of Nietzsche's genealogical method for the digital age - a browser extension that uses AI as a partner in truth-seeking, not an oracle of it.
+**Concept Tracer** is the operationalization of Nietzsche's genealogical method for the digital age - a browser extension that uses AI as a partner in truth-seeking, not an oracle of it.
 
 ## What It Does
 
-Select any word or phrase on a webpage and instantly examine its intellectual history. Instead of flat definitions, Genealogy Tracer reveals a concept's genealogy: the story of its emergence, mutations, and the intellectual battles that have shaped it.
+Select any word or phrase on a webpage and instantly examine its intellectual history. Instead of flat definitions, Concept Tracer reveals a concept's genealogy: the story of its emergence, mutations, and the intellectual battles that have shaped it.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/genealogy-demo.gif" alt="Genealogy Tracer Demo" width="600"/>
+  <img src="https://github.com/user-attachments/assets/genealogy-demo.gif" alt="Concept Tracer Demo" width="600"/>
 </p>
 
 ### Features
@@ -31,7 +31,7 @@ Select any word or phrase on a webpage and instantly examine its intellectual hi
 ## 🚀 How to Use
 
 1. **Install the Extension**
-   - Download `genealogy-tracer-extension.zip` from the releases
+   - Download `concept-tracer-extension.zip` from the releases
    - Go to `chrome://extensions/` in Chrome
    - Enable "Developer mode" (top right toggle)
    - Click "Load unpacked" and select the unzipped folder

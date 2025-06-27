@@ -537,6 +537,9 @@ document.addEventListener('DOMContentLoaded', function () {
   function completeStreaming() {
     streamingActive = false;
     
+    // Hide loading state when streaming completes
+    loadingStateDiv.style.display = 'none';
+    
     if (streamedItems.length > 0 || streamedQuestions.length > 0) {
       const copyAllContainer = document.createElement('div');
       copyAllContainer.className = 'copy-all-container';
@@ -661,10 +664,7 @@ document.addEventListener('DOMContentLoaded', function () {
                   break;
                   
                 case 'complete':
-                  showLoading('Research complete', false);
-                  setTimeout(() => {
-                    completeStreaming();
-                  }, 800);
+                  completeStreaming();
                   return;
                   
                 case 'error':
@@ -823,7 +823,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeCollapsibleElements();
   }
 
-  showLoading('Retrieving selected passage');
+  // Check if we have selected text, if not show intro page
   chrome.runtime.sendMessage({ action: "getTraceForSelectedText" }, function (response) {
     if (chrome.runtime.lastError) {
       showError("Could not communicate with background script: " + chrome.runtime.lastError.message);
@@ -831,17 +831,56 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (response) {
       if (response.error) {
-        showError(response.error);
+        if (response.error.includes("No text selected") || response.error.includes("no text")) {
+          showIntroPage();
+        } else {
+          showError(response.error);
+        }
       } else if (response.trace) {
+        showLoading('Retrieving selected passage');
         displayData(response.trace, response.fromCache);
       } else if (response.selectedText) {
+        showLoading('Retrieving selected passage');
         // Direct streaming with selected text
         performDirectTrace(response.selectedText);
       } else {
-        showError("Received an unexpected response from background script.");
+        showIntroPage();
       }
     } else {
-      showError("No response from background script.");
+      showIntroPage();
     }
   });
+
+  function showIntroPage() {
+    // Hide all other sections
+    loadingStateDiv.style.display = 'none';
+    errorStateDiv.style.display = 'none';
+    resultsContainer.style.display = 'none';
+    document.getElementById('search-term-display').style.display = 'none';
+    
+    // Show intro page
+    const introPage = document.getElementById('intro-page');
+    introPage.style.display = 'block';
+    
+    // Add event listeners for example terms
+    const exampleButtons = document.querySelectorAll('.example-term');
+    exampleButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const term = button.dataset.term;
+        introPage.style.display = 'none';
+        performDirectTrace(term);
+      });
+      
+      // Add hover effect
+      button.addEventListener('mouseenter', () => {
+        button.style.backgroundColor = '#f5f5f5';
+        button.style.borderColor = '#999';
+      });
+      
+      button.addEventListener('mouseleave', () => {
+        button.style.backgroundColor = '#fff';
+        button.style.borderColor = '#ccc';
+      });
+    });
+  }
 }); 

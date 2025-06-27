@@ -1,11 +1,11 @@
 // genealogy-tracer-demo.js
-// This file contains the bookmarklet code for the Genealogy Tracer.
+// This file contains the bookmarklet code for the Concept Tracer.
 // The actual Cloudflare Worker code is located in: trace-worker/red-heart-d66e/src/index.ts
 //
 // To use the bookmarklet:
 // 1. Ensure your Cloudflare Worker (red-heart-d66e) is deployed.
 // 2. Create a new bookmark in your browser.
-// 3. For the bookmark's name, use something like "Genealogy Trace".
+// 3. For the bookmark's name, use something like "Concept Trace".
 // 4. For the bookmark's URL/Location, paste the entire 'javascript:(async function...' line below.
 //    Ensure it's pasted as a single line without any line breaks.
 // 5. To use: Select some text on any webpage, then click the bookmark.

@@ -23,15 +23,15 @@ A **private key file** (`.pem`) is a cryptographic key used to:
 
 3. **Result:**
    - Chrome creates two files:
-     - `genealogy-tracer.crx` - The packaged extension
-     - `genealogy-tracer.pem` - Your private key (**KEEP THIS SAFE!**)
+     - `concept-tracer.crx` - The packaged extension
+     - `concept-tracer.pem` - Your private key (**KEEP THIS SAFE!**)
 
 ### Method 2: Command Line (Advanced)
 
 ```bash
 # Install Chrome command line tools (if not already installed)
 # Then pack the extension
-google-chrome --pack-extension=./dist --pack-extension-key=./genealogy-tracer.pem
+google-chrome --pack-extension=./dist --pack-extension-key=./concept-tracer.pem
 ```
 
 ## Important Notes About Private Keys
