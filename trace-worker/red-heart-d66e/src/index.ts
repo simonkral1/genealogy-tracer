@@ -22,8 +22,8 @@ export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		const url = new URL(request.url);
 
-		// CORS pre-flight for /trace and /stream
-		if ((url.pathname === '/trace' || url.pathname === '/stream') && request.method === 'OPTIONS') {
+		// CORS pre-flight for /trace, /stream, and /expand
+		if ((url.pathname === '/trace' || url.pathname === '/stream' || url.pathname === '/expand') && request.method === 'OPTIONS') {
 			return new Response(null, {
 				headers: {
 					'Access-Control-Allow-Origin': '*',
@@ -390,12 +390,104 @@ Open Questions:
 			}
 		}
 
+		// New /expand endpoint for detailed analysis of genealogy items
+		if (url.pathname === '/expand' && request.method === 'POST') {
+			try {
+				const requestData = await request.json() as { title?: string; year?: string; claim?: string };
+				const { title, year, claim } = requestData;
+				
+				if (!title || !year || !claim) {
+					return new Response(JSON.stringify({ error: 'Missing required fields: title, year, claim' }), {
+						status: 400,
+						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+					});
+				}
+
+				const prompt = `You are a brilliant intellectual historian writing for curious scholars. Analyze "${title}" (${year}) with fascinating specificity.
+
+Key insight to develop: ${claim}
+
+Write 3-4 sentences that reveal:
+1. What made this work revolutionary or paradigm-shifting for its time
+2. A specific intellectual move, method, or insight that influenced later thinkers
+3. How it connects to broader cultural/political contexts of ${year}
+4. Why it still matters for contemporary debates
+
+Be concrete, vivid, and avoid generic academic language. Think Foucault meeting a brilliant graduate seminar - scholarly but intellectually electric.`;
+
+				// Call Anthropic API
+				const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
+				const anthropicApiKey = env.ANTHROPIC_API_KEY;
+
+				if (!anthropicApiKey) {
+					return new Response(JSON.stringify({ error: 'Anthropic API key not configured' }), {
+						status: 500,
+						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+					});
+				}
+
+				const llmRes = await fetch(anthropicApiUrl, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-api-key': anthropicApiKey,
+						'anthropic-version': '2023-06-01',
+					},
+					body: JSON.stringify({
+						model: 'claude-sonnet-4-20250514',
+						messages: [{ role: 'user', content: prompt }],
+						max_tokens: 800,
+					}),
+				});
+
+				if (!llmRes.ok) {
+					const errorBody = await llmRes.text();
+					console.error('Claude API error:', llmRes.status, errorBody);
+					return new Response(JSON.stringify({ error: `AI service error: ${llmRes.status}` }), {
+						status: 500,
+						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+					});
+				}
+
+				const llmJson = (await llmRes.json()) as any;
+				
+				let expandedContent = '';
+				if (llmJson.content && Array.isArray(llmJson.content) && llmJson.content.length > 0) {
+					const textBlock = llmJson.content.find((block: any) => block.type === 'text');
+					if (textBlock && textBlock.text) {
+						expandedContent = textBlock.text.trim();
+					}
+				}
+
+				if (!expandedContent) {
+					return new Response(JSON.stringify({ error: 'Failed to generate expanded content' }), {
+						status: 500,
+						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+					});
+				}
+
+				return new Response(JSON.stringify({ content: expandedContent }), {
+					headers: { 
+						'Content-Type': 'application/json',
+						'Access-Control-Allow-Origin': '*' 
+					},
+				});
+
+			} catch (e: any) {
+				console.error('Worker error during /expand:', e);
+				return new Response(JSON.stringify({ error: 'Expand processing error', details: e.message }), {
+					status: 500,
+					headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+				});
+			}
+		}
+
 		if (url.pathname === '/') {
-			return new Response('Genealogy AI Trace Worker is running. Use the /trace endpoint with POST for full response or /stream for streaming.', {
+			return new Response('Genealogy AI Trace Worker is running. Use the /trace endpoint with POST for full response, /stream for streaming, or /expand for detailed analysis.', {
 				headers: { 'Content-Type': 'text/plain' },
 			});
 		}
 
-		return new Response('Not found. Use /trace with POST or /stream with POST or visit the root /.', { status: 404 });
+		return new Response('Not found. Use /trace with POST, /stream with POST, /expand with POST, or visit the root /.', { status: 404 });
 	},
 } satisfies ExportedHandler<Env>;

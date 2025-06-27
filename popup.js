@@ -166,126 +166,41 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
   async function fetchExpandedContent(item) {
-    console.log('🔥 MAKING ENHANCED LLM CALL for:', item.title);
+    console.log('🔥 MAKING EXPAND LLM CALL for:', item.title);
     
     try {
-      const prompt = `You are a brilliant intellectual historian writing for curious scholars. Analyze "${item.title}" (${item.year}) with fascinating specificity.
-
-Key insight to develop: ${item.claim}
-
-Write 3-4 sentences that reveal:
-1. What made this work revolutionary or paradigm-shifting for its time
-2. A specific intellectual move, method, or insight that influenced later thinkers
-3. How it connects to broader cultural/political contexts of ${item.year}
-4. Why it still matters for contemporary debates
-
-Be concrete, vivid, and avoid generic academic language. Think Foucault meeting a brilliant graduate seminar - scholarly but intellectually electric.`;
-
-      console.log('📝 Sending prompt to LLM:', prompt);
-
-      const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/stream', {
+      const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/expand', {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain',
+          'Content-Type': 'application/json',
         },
-        body: prompt
+        body: JSON.stringify({
+          title: item.title,
+          year: item.year,
+          claim: item.claim
+        })
       });
 
-      console.log('📡 Response status:', response.status);
+      console.log('📡 Expand response status:', response.status);
 
       if (!response.ok) {
-        console.error('❌ API Error:', response.status);
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.error('❌ Expand API Error:', response.status);
+        throw new Error(`Expand service error: ${response.status}`);
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = '';
-      let buffer = '';
-
-      console.log('📥 Starting to read stream...');
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            console.log('✅ Stream complete');
-            break;
-          }
-          
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
-          
-          // Process complete SSE events delineated by a blank line ("\n\n")
-          let eventEnd;
-          while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
-            const rawEvent = buffer.slice(0, eventEnd).trim();
-            buffer = buffer.slice(eventEnd + 2);
-            if (!rawEvent.startsWith('data:')) continue;
-            try {
-              const jsonStr = rawEvent.slice(5).trim();
-              if (jsonStr === '') continue;
-              const data = JSON.parse(jsonStr);
-              
-              // Extract text from different possible response formats
-              if (data.type === 'content' && data.text) {
-                fullResponse += data.text;
-              } else if (data.content) {
-                fullResponse += data.content;
-              } else if (data.delta && data.delta.text) {
-                fullResponse += data.delta.text;
-              } else if (data.text) {
-                fullResponse += data.text;
-              }
-            } catch (parseError) {
-              console.error('Error parsing stream data:', parseError, 'Event:', rawEvent);
-            }
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
+      const responseData = await response.json();
       
-      console.log('📄 Full LLM response:', fullResponse);
-      
-      if (fullResponse.trim()) {
-        // Clean and format the response
-        let cleaned = fullResponse.trim();
-        
-        // Remove any markdown formatting
-        cleaned = cleaned.replace(/\*\*/g, '').replace(/\*/g, '');
-        
-        // Ensure it ends with proper punctuation
-        if (!cleaned.endsWith('.') && !cleaned.endsWith('!') && !cleaned.endsWith('?')) {
-          cleaned += '.';
-        }
-        
-        console.log('✨ Enhanced response generated:', cleaned.substring(0, 100) + '...');
-        return cleaned;
-      } else {
-        console.warn('⚠️ Empty LLM response, using enhanced fallback for:', item.title);
-        throw new Error('Empty response from LLM');
+      if (!responseData.content) {
+        console.error('❌ No content in expand response');
+        throw new Error('No content received from expand service');
       }
+
+      console.log('✨ Expand response received');
+      return responseData.content;
       
     } catch (error) {
-      console.error('💥 LLM call failed:', error);
-      
-      // Enhanced contextual fallback with more engaging content
-      const title = item.title.toLowerCase();
-      const claim = item.claim.toLowerCase();
-      const year = parseInt(item.year) || 0;
-      
-      if (title.includes('aristotle') || year < 500) {
-        return `${item.title} revolutionized intellectual inquiry by systematically categorizing knowledge in ways that dominated Western thought for over a millennium. Aristotle's method of empirical observation combined with logical reasoning created the template for scientific investigation, directly influencing Islamic scholars like Averroes and later shaping medieval universities. The work's integration of practical wisdom with theoretical knowledge established philosophy as both contemplative and politically engaged. Its shadow still looms over contemporary debates about the relationship between ethics, politics, and human flourishing.`;
-      } else if (title.includes('foucault') || claim.includes('power') || claim.includes('discourse')) {
-        return `${item.title} dismantled the illusion that knowledge is neutral by revealing how power relations shape what counts as truth in any given era. Foucault's archaeological method exposed the violent discontinuities hidden beneath smooth narratives of intellectual progress, showing how madness, sexuality, and criminality were constructed through specific institutional practices. This work provided the conceptual tools for understanding how seemingly objective disciplines like medicine and psychology function as technologies of social control. Its insights remain crucial for analyzing how contemporary institutions—from social media algorithms to psychiatric diagnosis—continue to shape human subjectivity.`;
-      } else if (title.includes('gender') || title.includes('sex') || claim.includes('gender') || title.includes('butler')) {
-        return `${item.title} shattered the naturalized boundary between sex and gender by revealing both as performative constructs maintained through repeated acts and social rituals. This work demonstrated how the seemingly stable categories of male/female are actually fragile effects of power that require constant reinforcement to maintain their appearance of inevitability. By exposing the theatrical dimension of gender identity, it opened space for subversive performances that could destabilize heteronormative assumptions. The work's influence extends far beyond gender studies, providing tools for analyzing how all identity categories are socially constructed yet experientially real.`;
-      } else if (year >= 1960 || claim.includes('postmodern') || claim.includes('structure')) {
-        return `${item.title} emerged during the intellectual upheaval of the 1960s-70s, when traditional humanistic certainties were being systematically dismantled by structuralist and post-structuralist thought. This work contributed to the broader project of revealing how seemingly natural categories—from the individual subject to historical progress—are actually products of specific cultural and linguistic systems. Its theoretical innovations helped establish new ways of reading texts, analyzing culture, and understanding the relationship between language and reality. The work remains vital for contemporary discussions about identity, representation, and the politics of knowledge production.`;
-      } else {
-        return `${item.title} marked a crucial intervention in ${Math.floor(year/100)*100}s intellectual life by challenging the dominant frameworks of its time through innovative methodological approaches. The work's central insight—that ${item.claim.toLowerCase()}—opened new possibilities for understanding both historical developments and contemporary problems. Its influence can be traced through subsequent generations of scholars who adopted its analytical tools while adapting them to new contexts and questions. The work's enduring significance lies in its demonstration that rigorous scholarship can simultaneously illuminate the past and transform present ways of thinking.`;
-      }
+      console.error('💥 Expand call failed:', error);
+      return `Error loading expanded analysis: ${error.message}. Please try again.`;
     }
   }
 
