@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Genealogy Tracer",
+  "name": "Concept Tracer",
   "version": "1.0",
   "description": "Trace the genealogy of selected text using AI",
   "permissions": [
@@ -24,7 +24,7 @@
     }
   ],
   "action": {
-    "default_title": "Genealogy Tracer",
+    "default_title": "Concept Tracer",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

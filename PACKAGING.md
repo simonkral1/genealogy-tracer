@@ -1,4 +1,4 @@
-# Chrome Extension Packaging Guide
+re# Chrome Extension Packaging Guide
 
 ## What is a Private Key File (.pem)?
 
