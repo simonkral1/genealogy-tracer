@@ -80,22 +80,6 @@ document.addEventListener('DOMContentLoaded', function () {
   
   let currentPhraseIndex = 0;
 
-  // New helper functions for XSS protection and URL validation
-  function sanitizeText(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  function createSafeUrl(url) {
-    try {
-      const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
-      return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : null;
-    } catch {
-      return null;
-    }
-  }
-
   function showLoading(message = null, showProgress = true) {
     // Don't hide results container if streaming is active
     if (!streamingActive) {
@@ -116,12 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const progressIndicator = document.getElementById('progress-indicator');
     
     if (loadingMessage) {
-      // Clear previous content safely and append animated dots
-      loadingMessage.textContent = displayMessage;
-      const dotsSpan = document.createElement('span');
-      dotsSpan.className = 'loading-dots';
-      dotsSpan.textContent = '...';
-      loadingMessage.appendChild(dotsSpan);
+      loadingMessage.innerHTML = `${displayMessage}<span class="loading-dots">...</span>`;
     }
     
     // Show/hide progress indicator
@@ -237,29 +216,31 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
           const chunk = decoder.decode(value, { stream: true });
           buffer += chunk;
           
-          // Process complete SSE events delineated by a blank line ("\n\n")
-          let eventEnd;
-          while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
-            const rawEvent = buffer.slice(0, eventEnd).trim();
-            buffer = buffer.slice(eventEnd + 2);
-            if (!rawEvent.startsWith('data:')) continue;
-            try {
-              const jsonStr = rawEvent.slice(5).trim();
-              if (jsonStr === '') continue;
-              const data = JSON.parse(jsonStr);
-              
-              // Extract text from different possible response formats
-              if (data.type === 'content' && data.text) {
-                fullResponse += data.text;
-              } else if (data.content) {
-                fullResponse += data.content;
-              } else if (data.delta && data.delta.text) {
-                fullResponse += data.delta.text;
-              } else if (data.text) {
-                fullResponse += data.text;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const jsonStr = line.slice(6).trim();
+                if (!jsonStr) continue;
+                
+                const data = JSON.parse(jsonStr);
+                console.log('📦 Received data chunk:', data);
+                
+                // Extract text from different possible response formats
+                if (data.type === 'content' && data.text) {
+                  fullResponse += data.text;
+                } else if (data.content) {
+                  fullResponse += data.content;
+                } else if (data.delta && data.delta.text) {
+                  fullResponse += data.delta.text;
+                } else if (data.text) {
+                  fullResponse += data.text;
+                }
+              } catch (parseError) {
+                console.warn('⚠️ Parse error for line:', line, parseError);
               }
-            } catch (parseError) {
-              console.error('Error parsing stream data:', parseError, 'Event:', rawEvent);
             }
           }
         }
@@ -478,7 +459,15 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
     textContentDiv.appendChild(yearSpan);
 
     if (item.url && item.url.toLowerCase() !== 'n/a' && item.url.toLowerCase() !== 'none' && item.url.trim() !== '') {
-      const safeUrl = createSafeUrl(item.url);
+      // Validate URL before creating link
+      let safeUrl;
+      try {
+        safeUrl = item.url.startsWith('http') ? item.url : `https://${item.url}`;
+        new URL(safeUrl); // Validate URL
+      } catch {
+        safeUrl = null;
+      }
+      
       if (safeUrl) {
         const link = document.createElement('a');
         link.href = safeUrl;
@@ -674,57 +663,59 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
           const chunk = decoder.decode(value, { stream: true });
           buffer += chunk;
           
-          // Process complete SSE events delineated by a blank line ("\n\n")
-          let eventEnd;
-          while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
-            const rawEvent = buffer.slice(0, eventEnd).trim();
-            buffer = buffer.slice(eventEnd + 2);
-            if (!rawEvent.startsWith('data:')) continue;
-            try {
-              const jsonStr = rawEvent.slice(5).trim();
-              if (jsonStr === '') continue;
-              const data = JSON.parse(jsonStr);
-              
-              switch (data.type) {
-                case 'status':
-                  // Map status messages to scholarly phrases
-                  const scholarlyPhrases = {
-                    'Querying Wikipedia': 'Searching bibliographic databases',
-                    'Calling Claude': 'Consulting historical records',
-                    'Processing genealogy': 'Tracing intellectual lineages',
-                    'Finalizing results': 'Compiling scholarly findings'
-                  };
-                  const scholarlyMessage = scholarlyPhrases[data.message] || 'Scouring the archives';
-                  showLoading(scholarlyMessage, true);
-                  break;
-                  
-                case 'genealogy_item':
-                  addGenealogyItem(data);
-                  break;
-                  
-                case 'section':
-                  if (data.section === 'questions') {
-                    showQuestionsSection();
-                  }
-                  break;
-                  
-                case 'question':
-                  addQuestion(data.text);
-                  break;
-                  
-                case 'complete':
-                  showLoading('Research complete', false);
-                  setTimeout(() => {
-                    completeStreaming();
-                  }, 800);
-                  return;
-                  
-                case 'error':
-                  showError(data.message);
-                  return;
+          // Process complete lines only
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const jsonStr = line.slice(6);
+                if (jsonStr.trim() === '') continue;
+                
+                const data = JSON.parse(jsonStr);
+                
+                switch (data.type) {
+                  case 'status':
+                    // Map status messages to scholarly phrases
+                    const scholarlyPhrases = {
+                      'Querying Wikipedia': 'Searching bibliographic databases',
+                      'Calling Claude': 'Consulting historical records',
+                      'Processing genealogy': 'Tracing intellectual lineages',
+                      'Finalizing results': 'Compiling scholarly findings'
+                    };
+                    const scholarlyMessage = scholarlyPhrases[data.message] || 'Scouring the archives';
+                    showLoading(scholarlyMessage, true);
+                    break;
+                    
+                  case 'genealogy_item':
+                    addGenealogyItem(data);
+                    break;
+                    
+                  case 'section':
+                    if (data.section === 'questions') {
+                      showQuestionsSection();
+                    }
+                    break;
+                    
+                  case 'question':
+                    addQuestion(data.text);
+                    break;
+                    
+                  case 'complete':
+                    showLoading('Research complete', false);
+                    setTimeout(() => {
+                      completeStreaming();
+                    }, 800);
+                    return;
+                    
+                  case 'error':
+                    showError(data.message);
+                    return;
+                }
+              } catch (parseError) {
+                console.error('Error parsing stream data:', parseError, 'Line:', line);
               }
-            } catch (parseError) {
-              console.error('Error parsing stream data:', parseError, 'Event:', rawEvent);
             }
           }
         }
@@ -814,15 +805,12 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
         textContentDiv.appendChild(yearSpan);
 
         if (url && url.toLowerCase() !== 'n/a' && url.toLowerCase() !== 'none' && url.trim() !== '') {
-          const safeUrl = createSafeUrl(url);
-          if (safeUrl) {
-            const link = document.createElement('a');
-            link.href = safeUrl;
-            link.textContent = '[source]';
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            textContentDiv.appendChild(link);
-          }
+          const link = document.createElement('a');
+          link.href = url.startsWith('http') ? url : '//' + url;
+          link.textContent = '[source]';
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          textContentDiv.appendChild(link);
         }
         
         const claimSpan = document.createElement('span');

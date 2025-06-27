@@ -11,8 +11,7 @@
     "storage"
   ],
   "host_permissions": [
-    "https://*.wikipedia.org/*",
-    "https://red-heart-d66e.simon-kral99.workers.dev/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"

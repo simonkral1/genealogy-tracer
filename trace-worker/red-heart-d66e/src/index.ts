@@ -49,7 +49,7 @@ export default {
 					async start(controller) {
 						try {
 							// Send initial status
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Searching Wikipedia..."}\n\n`));
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Querying Wikipedia"}\n\n`));
 
 							// Wikipedia search
 							const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
@@ -58,37 +58,38 @@ export default {
 							const wikiJson = (await wikiRes.json()) as any;
 							const titles = wikiJson.query.search.slice(0, 3).map((i: any) => i.title);
 
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Generating genealogy..."}\n\n`));
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Processing genealogy"}\n\n`));
 
 							// Prepare prompt
-							const prompt = `Act as a critical historian and genealogist in the spirit of Nietzsche and Foucault. Analyze the concept "${query}".
+							const prompt = `You are a brilliant intellectual historian tracing the genealogy of "${query}" with scholarly precision and creative insight.
 
-Construct a five-item genealogy. Each item should follow this format:
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
+Construct a five-item genealogy revealing how this concept emerged, transformed, and continues to evolve. Each item should follow this format:
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
 
 Guidelines:
-1. Prioritize historically influential sources, ideas, or events.
-2. Arrange items chronologically.
-3. Ensure each item offers a unique perspective or marks a significant development.
-4. For URLs, provide direct links to relevant primary sources, academic articles, or encyclopedic entries.
-5. Wikipedia titles for reference: ${titles.join(", ")}.
+1. Focus on works that fundamentally shifted how people understood this concept
+2. Arrange chronologically, showing intellectual evolution and ruptures
+3. Each claim should reveal what made that work revolutionary for its time
+4. URLs should link to primary sources, key texts, or authoritative encyclopedic entries
+5. Wikipedia references available: ${titles.join(", ")}
 
-After the genealogy, provide:
+After the genealogy, provide "Open Questions": 1-2 fundamental questions that remain unresolved and actively debated today about "${query}".
 
-"Open Questions": List 1-2 fundamental, still-debated questions about "${query}".
-
-Format your output exactly as:
+Format your response exactly as:
 <genealogy>
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
 
 Open Questions:
 - [Question 1]
 - [Question 2]
 </genealogy>`;
+
+							// Inform client that we are about to call the language model
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Calling Claude"}\n\n`));
 
 							// Call Anthropic API with streaming
 							const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
@@ -117,8 +118,8 @@ Open Questions:
 
 							if (!llmRes.ok) {
 								const errorBody = await llmRes.text();
-								console.error('Claude API error:', errorBody);
-								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"AI service error: ${errorBody}"}\n\n`));
+								console.error('Claude API error:', llmRes.status);
+								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"AI service error: ${llmRes.status}"}\n\n`));
 								controller.close();
 								return;
 							}
@@ -213,6 +214,7 @@ Open Questions:
 								reader.releaseLock();
 							}
 
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Finalizing results"}\n\n`));
 							controller.enqueue(new TextEncoder().encode(`data: {"type":"complete"}\n\n`));
 							controller.close();
 
@@ -269,29 +271,27 @@ Open Questions:
 				console.log(`[TIMING] Wikipedia search took: ${wikiEndTime - wikiStartTime}ms`);
 
 				// Optimized prompt for speed while maintaining quality
-				const prompt = `Act as a critical historian and genealogist in the spirit of Nietzsche and Foucault. Analyze the concept "${query}".
+				const prompt = `You are a brilliant intellectual historian tracing the genealogy of "${query}" with scholarly precision and creative insight.
 
-Construct a five-item genealogy. Each item should follow this format:
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
+Construct a five-item genealogy revealing how this concept emerged, transformed, and continues to evolve. Each item should follow this format:
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
 
 Guidelines:
-1. Prioritize historically influential sources, ideas, or events.
-2. Arrange items chronologically.
-3. Ensure each item offers a unique perspective or marks a significant development.
-4. For URLs, provide direct links to relevant primary sources, academic articles, or encyclopedic entries.
-5. Wikipedia titles for reference: ${titles.join(", ")}.
+1. Focus on works that fundamentally shifted how people understood this concept
+2. Arrange chronologically, showing intellectual evolution and ruptures
+3. Each claim should reveal what made that work revolutionary for its time
+4. URLs should link to primary sources, key texts, or authoritative encyclopedic entries
+5. Wikipedia references available: ${titles.join(", ")}
 
-After the genealogy, provide:
+After the genealogy, provide "Open Questions": 1-2 fundamental questions that remain unresolved and actively debated today about "${query}".
 
-"Open Questions": List 1-2 fundamental, still-debated questions about "${query}".
-
-Format your output exactly as:
+Format your response exactly as:
 <genealogy>
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
-[TITLE] ([YEAR]) [[URL]] — [ONE_LINE_CLAIM]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
 
 Open Questions:
 - [Question 1]
@@ -354,7 +354,7 @@ Open Questions:
 				}
 
 				if (!rawGenealogyContent) {
-						console.error("Error extracting content from LLM response:", JSON.stringify(llmJson, null, 2));
+						console.error("Error extracting content from LLM response (truncated):", JSON.stringify(llmJson).slice(0, 200));
 						return new Response("Error: Could not extract content from LLM response.", { 
 							status: 500, 
 							headers: { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' } 
