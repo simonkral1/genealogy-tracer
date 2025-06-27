@@ -6,7 +6,9 @@
   <style>
     body {
       font-family: 'Courier New', Courier, monospace;
-      width: 650px;
+      width: 100%;
+      min-width: 300px;
+      max-width: 600px;
       min-height: 200px;
       max-height: 650px;
       overflow-y: auto;
@@ -16,9 +18,7 @@
       font-size: 12px;
       line-height: 1.6;
       margin: 0;
-      border-left: 1px solid #e0e0e0;
-      border-right: 1px solid #e0e0e0;
-      border-bottom: 1px solid #e0e0e0;
+      box-sizing: border-box;
     }
     h1 {
       font-size: 16px;
@@ -48,20 +48,22 @@
     }
     
     .trace-items {
-      margin-right: 60px;
+      margin-right: 18%;
     }
     
     .timeline {
       position: absolute;
       right: 0;
       top: 0;
-      width: 50px;
+      width: 16%;
+      min-width: 80px;
+      max-width: 120px;
       min-height: 100%;
     }
     
     .timeline-line {
       position: absolute;
-      left: 8px;
+      left: 20%;
       top: 20px;
       bottom: 20px;
       width: 1px;
@@ -79,7 +81,7 @@
     .timeline-item::before {
       content: '';
       position: absolute;
-      left: 5px;
+      left: 17%;
       top: 50%;
       transform: translateY(-50%);
       width: 6px;
@@ -93,14 +95,13 @@
       font-size: 8px;
       color: #666;
       font-weight: bold;
-      margin-left: 16px;
+      margin-left: 30%;
       white-space: nowrap;
     }
     
     #trace-output .trace-item {
       background: #fafafa;
       padding: 12px;
-      border: 1px solid #e8e8e8;
       margin-bottom: 2px;
       transition: background-color 0.2s ease;
       word-wrap: break-word;
@@ -113,7 +114,6 @@
     #questions-section ul {
       background: #fafafa;
       padding: 16px;
-      border: 1px solid #e8e8e8;
       margin: 0;
     }
     #trace-output .trace-item {

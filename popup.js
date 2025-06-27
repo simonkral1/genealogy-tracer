@@ -307,7 +307,8 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
   function updateTimelinePositions() {
     if (!timeline) return;
     
-    setTimeout(() => {
+    // Use requestAnimationFrame for smooth, dynamic updates
+    requestAnimationFrame(() => {
       const traceItems = document.querySelectorAll('.trace-item');
       const timelineItems = document.querySelectorAll('.timeline-item');
       const timelineLine = timeline.querySelector('.timeline-line');
@@ -326,16 +327,55 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
       
       timelineItems.forEach((timelineItem, index) => {
         if (traceItems[index]) {
-          const traceItemHeight = traceItems[index].offsetHeight;
+          const traceItem = traceItems[index];
+          const traceItemHeight = traceItem.offsetHeight;
+          
+          // Calculate cumulative height more precisely
           const cumulativeHeight = Array.from(traceItems).slice(0, index).reduce((sum, item) => {
             return sum + item.offsetHeight + 2; // +2 for margin-bottom
           }, 0);
           
-          const centerPosition = cumulativeHeight + (traceItemHeight / 2) - 8;
+          // Center the timeline item to the exact middle of the genealogy item
+          const centerPosition = cumulativeHeight + (traceItemHeight / 2) - (16 / 2); // 16 is timeline-item height
           timelineItem.style.top = `${centerPosition}px`;
         }
       });
-    }, 100);
+    });
+  }
+
+  // Dynamic timeline positioning with ResizeObserver and event listeners
+  let timelineUpdateTimeout;
+  function scheduleDynamicTimelineUpdate() {
+    if (timelineUpdateTimeout) clearTimeout(timelineUpdateTimeout);
+    timelineUpdateTimeout = setTimeout(updateTimelinePositions, 16); // ~60fps
+  }
+
+  // Set up dynamic timeline positioning
+  function initializeDynamicTimeline() {
+    // Update on window resize
+    window.addEventListener('resize', scheduleDynamicTimelineUpdate);
+    
+    // Set up ResizeObserver for trace items if supported
+    if (window.ResizeObserver) {
+      const resizeObserver = new ResizeObserver(scheduleDynamicTimelineUpdate);
+      
+      // Observe the trace output container
+      if (traceOutputDiv) {
+        resizeObserver.observe(traceOutputDiv);
+      }
+      
+      // Observe individual trace items as they're added
+      const observer = new MutationObserver(() => {
+        document.querySelectorAll('.trace-item').forEach(item => {
+          resizeObserver.observe(item);
+        });
+        scheduleDynamicTimelineUpdate();
+      });
+      
+      if (traceOutputDiv) {
+        observer.observe(traceOutputDiv, { childList: true, subtree: true });
+      }
+    }
   }
 
   function initializeCollapsibleElements() {
@@ -417,8 +457,11 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
     traceOutputDiv.style.display = 'block';
     questionsSectionDiv.style.display = 'none';
     
-    // Initialize collapsible elements
-    initializeCollapsibleElements();
+      // Initialize collapsible elements
+  initializeCollapsibleElements();
+  
+  // Initialize dynamic timeline positioning
+  initializeDynamicTimeline();
   }
 
   function addGenealogyItem(item) {
@@ -514,7 +557,7 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
         expandButton.textContent = 'collapse';
       }
       // Update timeline positions after expand/collapse
-      updateTimelinePositions();
+      scheduleDynamicTimelineUpdate();
     });
     buttonsDiv.appendChild(expandButton);
     
@@ -542,7 +585,7 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
     addTimelineItem(item.year, traceStats.itemCount);
     
     // Update timeline positions progressively
-    updateTimelinePositions();
+    scheduleDynamicTimelineUpdate();
   }
 
   function showQuestionsSection() {
@@ -601,7 +644,7 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
 
     
     // Update timeline positions after all items are loaded
-    updateTimelinePositions();
+    scheduleDynamicTimelineUpdate();
   }
 
   let currentTraceText = null;
