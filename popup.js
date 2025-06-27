@@ -6,10 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const loadingStateDiv = document.getElementById('loading-state');
   const errorStateDiv = document.getElementById('error-state');
   const errorStateP = errorStateDiv.querySelector('p');
-  const statsItemsCount = document.getElementById('items-count');
-  const statsQuestionsCount = document.getElementById('questions-count');
-  const statsTimeSpan = document.getElementById('time-span');
-  const statsSummary = document.getElementById('stats-summary');
+
   const questionsHeader = document.getElementById('questions-header');
   const questionsContent = document.getElementById('questions-content');
   const timeline = document.getElementById('timeline');
@@ -166,25 +163,7 @@ document.addEventListener('DOMContentLoaded', function () {
     errorStateP.textContent = displayMessage;
   }
 
-  function updateStats() {
-    if (statsItemsCount) statsItemsCount.textContent = traceStats.itemCount;
-    if (statsQuestionsCount) statsQuestionsCount.textContent = traceStats.questionCount;
-    
-    if (traceStats.earliestYear && traceStats.latestYear) {
-      const timeSpan = traceStats.latestYear - traceStats.earliestYear;
-      if (statsTimeSpan) {
-        if (timeSpan > 0) {
-          statsTimeSpan.textContent = `${timeSpan} year span`;
-        } else {
-          statsTimeSpan.textContent = 'single year';
-        }
-      }
-    }
-    
-    if (traceStats.itemCount > 0 || traceStats.questionCount > 0) {
-      if (statsSummary) statsSummary.style.display = 'flex';
-    }
-  }
+
 
   async function fetchExpandedContent(item) {
     console.log('🔥 MAKING ENHANCED LLM CALL for:', item.title);
@@ -426,8 +405,7 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
     errorStateDiv.style.display = 'none';
     resultsContainer.style.display = 'block';
     
-    // Hide stats initially
-    if (statsSummary) statsSummary.style.display = 'none';
+
     
     if (fromCache) {
       const cacheIndicator = document.createElement('div');
@@ -563,8 +541,6 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
     // Add timeline item
     addTimelineItem(item.year, traceStats.itemCount);
     
-    updateStats();
-    
     // Update timeline positions progressively
     updateTimelinePositions();
   }
@@ -590,7 +566,6 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
     }, traceStats.questionCount * 50);
     
     streamedQuestions.push(questionText);
-    updateStats();
   }
 
   function completeStreaming() {
@@ -623,8 +598,7 @@ Be concrete, vivid, and avoid generic academic language. Think Foucault meeting 
       }
     }
     
-    // Final stats update
-    updateStats();
+
     
     // Update timeline positions after all items are loaded
     updateTimelinePositions();

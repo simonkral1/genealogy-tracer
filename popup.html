@@ -275,36 +275,7 @@
       max-height: 0;
     }
     
-    .stats-summary {
-      background: #fafafa;
-      border: 1px solid #e8e8e8;
-      padding: 10px;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 10px;
-      width: calc(100% - 60px);
-      max-width: calc(100% - 60px);
-    }
-    
-    .stat-item {
-      color: #666;
-      text-align: left;
-    }
-    
-    .stat-value {
-      font-size: 16px;
-      font-weight: normal;
-      display: block;
-      color: #2c2c2c;
-    }
-    
-    .stat-label {
-      font-size: 10px;
-      color: #999;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
+
     .loading, .error {
       text-align: left;
       padding: 20px;
@@ -355,20 +326,6 @@
   </div>
 
   <div id="results-container" style="display:none;">
-    <div class="stats-summary" id="stats-summary" style="display:none;">
-      <div class="stat-item">
-        <span class="stat-value" id="items-count">0</span>
-        <span class="stat-label">sources</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-value" id="questions-count">0</span>
-        <span class="stat-label">inquiries</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-value" id="time-span">-</span>
-        <span class="stat-label">chronology</span>
-      </div>
-    </div>
     <div class="trace-container">
       <div class="trace-items" id="trace-output">
         <!-- Trace items will be dynamically inserted here -->
