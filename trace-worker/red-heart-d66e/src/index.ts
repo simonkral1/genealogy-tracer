@@ -186,20 +186,31 @@ Open Questions:
 													
 													// Parse questions (only if in questions section)
 													if (readingQuestions) {
-														// Look for complete questions ending with punctuation
-														const questionPattern = /-\s*([^?\n]+\?)/g;
-														let questionMatch;
-														while ((questionMatch = questionPattern.exec(accumulator)) !== null) {
-															const questionText = questionMatch[1].trim();
+														// Split into lines and look for proper question format
+														const lines = accumulator.split('\n');
+														for (const line of lines) {
+															const trimmedLine = line.trim();
 															
-															// Filter out partial questions and genealogy remnants
-															if (questionText.length > 20 && 
-																!questionText.includes('[[') && 
-																!questionText.includes('—') &&
-																!processedQuestions.has(questionText)) {
+															// Only match lines that start with "- " and contain a question mark
+															if (trimmedLine.startsWith('- ') && trimmedLine.includes('?')) {
+																const questionText = trimmedLine.substring(2).trim(); // Remove "- " prefix
 																
-																processedQuestions.add(questionText);
-																controller.enqueue(new TextEncoder().encode(`data: {"type":"question","text":"${questionText.replace(/"/g, '\\"')}"}\n\n`));
+																// Filter for valid questions
+																if (questionText.length > 30 && 
+																	questionText.length < 400 && 
+																	questionText.endsWith('?') &&
+																	!questionText.includes('[[') && 
+																	!questionText.includes('—') &&
+																	!questionText.includes('(') &&
+																	!questionText.toLowerCase().includes('thereby') && // Common in genealogy descriptions
+																	!questionText.toLowerCase().includes('establishing') && // Common in genealogy descriptions
+																	!questionText.toLowerCase().includes('demonstrat') && // Common in genealogy descriptions
+																	questionText.split(' ').length > 8 && // Must be substantial
+																	!processedQuestions.has(questionText)) {
+																	
+																	processedQuestions.add(questionText);
+																	controller.enqueue(new TextEncoder().encode(`data: {"type":"question","text":"${questionText.replace(/"/g, '\\"')}"}\n\n`));
+																}
 															}
 														}
 													}
@@ -403,17 +414,15 @@ Open Questions:
 					});
 				}
 
-				const prompt = `You are a brilliant intellectual historian writing for curious scholars. Analyze "${title}" (${year}) with fascinating specificity.
+				const prompt = `Explain "${title}" (${year}) in simple, clear terms. Focus on: ${claim}
 
-Key insight to develop: ${claim}
+Write exactly 3-4 sentences (under 100 words total) that explain:
+1. Why this work was important when it came out
+2. What new idea or approach it introduced
+3. How it influenced later thinking
+4. Why it still matters today
 
-Write 3-4 sentences that reveal:
-1. What made this work revolutionary or paradigm-shifting for its time
-2. A specific intellectual move, method, or insight that influenced later thinkers
-3. How it connects to broader cultural/political contexts of ${year}
-4. Why it still matters for contemporary debates
-
-Be concrete, vivid, and avoid generic academic language. Think Foucault meeting a brilliant graduate seminar - scholarly but intellectually electric.`;
+Use clear, straightforward language that anyone can understand. Be direct and to the point.`;
 
 				// Call Anthropic API
 				const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
