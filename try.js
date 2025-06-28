@@ -480,19 +480,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (done) break;
                 
                 buffer += decoder.decode(value, { stream: true });
+                console.log('Raw buffer chunk:', buffer);
                 
-                // Process complete SSE events delineated by a blank line ("\n\n")
+                // Process complete SSE events delineated by a blank line ("\n\n")  
                 let eventEnd;
                 while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
                     const rawEvent = buffer.slice(0, eventEnd).trim();
                     buffer = buffer.slice(eventEnd + 2);
+                    console.log('Raw event:', rawEvent);
+                    
                     if (!rawEvent.startsWith('data:')) continue;
                     try {
                         const jsonStr = rawEvent.slice(5).trim();
+                        console.log('JSON string:', jsonStr);
                         if (jsonStr === '') continue;
                         const data = JSON.parse(jsonStr);
                         
-                        console.log('Received data:', data.type, data);
+                        console.log('Parsed data:', data.type, data);
                         
                         switch (data.type) {
                             case 'status':
@@ -547,6 +551,50 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
                     } catch (parseError) {
                         console.error('Error parsing stream data:', parseError, 'Event:', rawEvent);
+                    }
+                }
+                
+                // Alternative parsing: try line-by-line parsing as fallback
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // Keep incomplete line in buffer
+                
+                for (const line of lines) {
+                    if (line.trim() === '') continue;
+                    console.log('Processing line:', line);
+                    
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const jsonData = JSON.parse(line.slice(6));
+                            console.log('Line-parsed data:', jsonData.type, jsonData);
+                            
+                            // Process the same way as above
+                            switch (jsonData.type) {
+                                case 'genealogy_item':
+                                    if (genealogyItems.length === 0) {
+                                        showResults();
+                                    }
+                                    genealogyItems.push(jsonData);
+                                    streamedItems.push(jsonData);
+                                    addGenealogyItem(jsonData);
+                                    break;
+                                case 'question':
+                                    if (questionsSection.style.display === 'none') {
+                                        questionsSection.style.display = 'block';
+                                    }
+                                    questions.push(jsonData.text);
+                                    streamedQuestions.push(jsonData.text);
+                                    addQuestion(jsonData.text);
+                                    break;
+                                case 'complete':
+                                    setCachedResponse(currentQuery, {
+                                        genealogy: genealogyItems,
+                                        questions: questions
+                                    });
+                                    return;
+                            }
+                        } catch (lineParseError) {
+                            console.error('Error parsing line:', lineParseError, 'Line:', line);
+                        }
                     }
                 }
             }
