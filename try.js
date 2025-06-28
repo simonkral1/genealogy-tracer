@@ -329,7 +329,14 @@ document.addEventListener('DOMContentLoaded', function () {
         buttonsDiv.appendChild(expandButton);
         
         itemDiv.appendChild(buttonsDiv);
-        traceOutput.appendChild(itemDiv);
+        
+        // Insert before copy-all container if it exists, like the extension does
+        const copyAllContainer = traceOutput.querySelector('.copy-all-container');
+        if (copyAllContainer) {
+            traceOutput.insertBefore(itemDiv, copyAllContainer);
+        } else {
+            traceOutput.appendChild(itemDiv);
+        }
         
         // Animate the item in with staggered delay
         setTimeout(() => {
@@ -426,6 +433,26 @@ document.addEventListener('DOMContentLoaded', function () {
         loadingState.style.display = 'none';
         
         if (streamedItems.length > 0 || streamedQuestions.length > 0) {
+            // Add copy-all button like the extension does
+            const copyAllContainer = document.createElement('div');
+            copyAllContainer.className = 'copy-all-container';
+            
+            let allTraceText = streamedItems.map(item => 
+                `${item.title} (${item.year}) [${item.url}] — ${item.claim}`
+            ).join('\n');
+            
+            if (streamedQuestions.length > 0) {
+                allTraceText += '\n\nOpen Questions:\n' + streamedQuestions.map(q => `- ${q}`).join('\n');
+            }
+            
+            const copyAllBtn = document.createElement('button');
+            copyAllBtn.textContent = 'copy';
+            copyAllBtn.className = 'copy-all-button';
+            copyAllBtn.addEventListener('click', () => copyToClipboard(allTraceText));
+            copyAllContainer.appendChild(copyAllBtn);
+            
+            traceOutput.appendChild(copyAllContainer);
+            
             // Cache the complete response for future use
             const cacheData = {
                 genealogy: streamedItems,
@@ -433,6 +460,10 @@ document.addEventListener('DOMContentLoaded', function () {
             };
             setCachedResponse(currentQuery, cacheData);
         }
+        
+        // Re-enable trace button
+        traceButton.disabled = false;
+        traceButton.textContent = 'Trace Genealogy';
         
         // Update timeline positions after all items are loaded
         setTimeout(updateTimelinePositions, 100);
