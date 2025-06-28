@@ -63,6 +63,19 @@ header {
     gap: var(--spacing-md);
 }
 
+.logo-link {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    text-decoration: none;
+    color: inherit;
+    transition: opacity 0.2s ease;
+}
+
+.logo-link:hover {
+    opacity: 0.8;
+}
+
 .main-logo {
     width: 40px;
     height: 40px;
@@ -222,6 +235,18 @@ section h3 {
 .about-text p {
     margin-bottom: var(--spacing-md);
     color: var(--color-text);
+}
+
+.learn-more-link {
+    color: var(--color-text-dark);
+    text-decoration: none;
+    font-size: 14px;
+    letter-spacing: 1px;
+    transition: color 0.2s ease;
+}
+
+.learn-more-link:hover {
+    color: var(--color-accent);
 }
 
 .timeline-preview {
@@ -771,6 +796,73 @@ code {
     font-weight: bold;
 }
 
+/* About Page */
+.about-main {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: var(--spacing-xxl) var(--spacing-md);
+}
+
+.about-hero {
+    text-align: center;
+    margin-bottom: var(--spacing-xxl);
+}
+
+.about-hero h1 {
+    font-size: 32px;
+    font-weight: normal;
+    color: var(--color-text-dark);
+    margin-bottom: var(--spacing-md);
+    letter-spacing: 2px;
+}
+
+.about-subtitle {
+    font-size: 16px;
+    color: var(--color-text-light);
+    font-style: italic;
+}
+
+.about-text-long {
+    margin-bottom: var(--spacing-xxl);
+}
+
+.about-text-long p {
+    margin-bottom: var(--spacing-lg);
+    color: var(--color-text);
+    line-height: 1.8;
+}
+
+.about-features h2 {
+    margin-bottom: var(--spacing-lg);
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.feature-item {
+    padding: var(--spacing-lg);
+    background: var(--color-bg-light);
+    border: 1px solid var(--color-border);
+}
+
+.feature-item h3 {
+    margin-bottom: var(--spacing-md);
+    color: var(--color-text-dark);
+}
+
+.feature-item p {
+    color: var(--color-text);
+    font-size: 14px;
+}
+
+nav a.active {
+    color: var(--color-text-dark);
+    border-bottom: 1px solid var(--color-text-dark);
+}
+
 /* Footer */
 footer {
     border-top: 1px solid var(--color-border);
@@ -791,6 +883,25 @@ footer {
     color: var(--color-text-light);
     font-style: italic;
     font-size: 12px;
+}
+
+.footer-quotes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.footer-quotes p {
+    font-size: 11px;
+    color: var(--color-text-light);
+    font-style: italic;
+    margin: 0;
+}
+
+.footer-quotes em {
+    font-style: normal;
+    font-weight: bold;
+    opacity: 0.8;
 }
 
 .footer-links {
