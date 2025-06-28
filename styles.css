@@ -76,6 +76,11 @@ header {
     opacity: 0.8;
 }
 
+.logo-link h1 {
+    text-decoration: none;
+    border: none;
+}
+
 .main-logo {
     width: 40px;
     height: 40px;
@@ -842,10 +847,22 @@ code {
     gap: var(--spacing-lg);
 }
 
+.features-horizontal {
+    display: flex;
+    flex-direction: row;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
 .feature-item {
     padding: var(--spacing-lg);
     background: var(--color-bg-light);
     border: 1px solid var(--color-border);
+}
+
+.features-horizontal .feature-item {
+    flex: 1;
+    min-width: 200px;
 }
 
 .feature-item h3 {
@@ -883,6 +900,10 @@ footer {
     color: var(--color-text-light);
     font-style: italic;
     font-size: 12px;
+}
+
+#rotating-quote {
+    transition: opacity 0.3s ease;
 }
 
 .footer-quotes {
@@ -971,6 +992,14 @@ footer {
         flex-direction: column;
         gap: var(--spacing-md);
         text-align: center;
+    }
+    
+    .features-horizontal {
+        flex-direction: column;
+    }
+    
+    .features-horizontal .feature-item {
+        min-width: auto;
     }
 }
 

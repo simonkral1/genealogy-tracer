@@ -129,10 +129,8 @@
 
         <footer>
             <div class="footer-content">
-                <div class="footer-quotes">
-                    <p>"The cause of the origin of a thing and its eventual utility, its actual employment and place in a system of purposes, lie worlds apart." <em>— Nietzsche</em></p>
-                    <p>"Genealogy is gray, meticulous, and patiently documentary. It operates on a field of entangled and confused parchments, on documents that have been scratched over and recopied many times." <em>— Foucault</em></p>
-                    <p>"Knowledge is not made for understanding; it is made for cutting." <em>— Foucault</em></p>
+                <div class="footer-text">
+                    <p id="rotating-quote">"There are no facts, only interpretations." <em>— Nietzsche</em></p>
                 </div>
                 <div class="footer-links">
                     <a href="https://github.com/genealogy-ai">GitHub</a>
@@ -140,6 +138,33 @@
                 </div>
             </div>
         </footer>
+
+        <script>
+            // Rotating quotes
+            const quotes = [
+                '"There are no facts, only interpretations." <em>— Nietzsche</em>',
+                '"The cause of the origin of a thing and its eventual utility, its actual employment and place in a system of purposes, lie worlds apart." <em>— Nietzsche</em>',
+                '"Genealogy is gray, meticulous, and patiently documentary. It operates on a field of entangled and confused parchments, on documents that have been scratched over and recopied many times." <em>— Foucault</em>',
+                '"Knowledge is not made for understanding; it is made for cutting." <em>— Foucault</em>',
+                '"I have tried to define this blank space from which I speak, and which is slowly taking shape in a discourse that I still feel to be so precarious and so unsure." <em>— Foucault</em>'
+            ];
+            
+            let currentQuoteIndex = 0;
+            const quoteElement = document.getElementById('rotating-quote');
+            
+            function rotateQuote() {
+                currentQuoteIndex = (currentQuoteIndex + 1) % quotes.length;
+                quoteElement.style.opacity = '0';
+                
+                setTimeout(() => {
+                    quoteElement.innerHTML = quotes[currentQuoteIndex];
+                    quoteElement.style.opacity = '1';
+                }, 300);
+            }
+            
+            // Rotate quote every 8 seconds
+            setInterval(rotateQuote, 8000);
+        </script>
     </div>
 </body>
 </html> 
