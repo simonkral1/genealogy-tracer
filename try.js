@@ -467,8 +467,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error('No response body');
             }
 
-            showResults();
-
             // Handle streaming response
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -494,6 +492,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (jsonStr === '') continue;
                         const data = JSON.parse(jsonStr);
                         
+                        console.log('Received data:', data.type, data);
+                        
                         switch (data.type) {
                             case 'status':
                                 // Map status messages to scholarly phrases
@@ -508,6 +508,10 @@ document.addEventListener('DOMContentLoaded', function () {
                                 break;
                                 
                             case 'genealogy_item':
+                                // Show results container on first item
+                                if (genealogyItems.length === 0) {
+                                    showResults();
+                                }
                                 genealogyItems.push(data);
                                 streamedItems.push(data);
                                 addGenealogyItem(data);
@@ -520,6 +524,10 @@ document.addEventListener('DOMContentLoaded', function () {
                                 break;
                                 
                             case 'question':
+                                // Show questions section if not already visible
+                                if (questionsSection.style.display === 'none') {
+                                    questionsSection.style.display = 'block';
+                                }
                                 questions.push(data.text);
                                 streamedQuestions.push(data.text);
                                 addQuestion(data.text);
@@ -556,23 +564,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function displayCachedResults(cachedData) {
-        showResults();
-        
-        if (cachedData.genealogy) {
+        if (cachedData.genealogy && cachedData.genealogy.length > 0) {
+            showResults();
+            
             cachedData.genealogy.forEach(item => {
                 streamedItems.push(item);
                 addGenealogyItem(item);
             });
+            
+            if (cachedData.questions) {
+                questionsSection.style.display = 'block';
+                cachedData.questions.forEach(question => {
+                    streamedQuestions.push(question);
+                    addQuestion(question);
+                });
+            }
+            
+            setTimeout(updateTimelinePositions, 100);
+        } else {
+            showError('No cached results found');
         }
-        
-        if (cachedData.questions) {
-            cachedData.questions.forEach(question => {
-                streamedQuestions.push(question);
-                addQuestion(question);
-            });
-        }
-        
-        setTimeout(updateTimelinePositions, 100);
     }
 
     // Event listeners
