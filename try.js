@@ -631,6 +631,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Focus input on load
-    conceptInput.focus();
+    // Handle URL parameters for direct concept links
+    const urlParams = new URLSearchParams(window.location.search);
+    const conceptFromUrl = urlParams.get('concept');
+    if (conceptFromUrl) {
+        conceptInput.value = conceptFromUrl;
+        // Auto-trace the concept after a brief delay
+        setTimeout(() => {
+            performTrace(conceptFromUrl);
+        }, 500);
+    } else {
+        // Focus input on load only if no concept from URL
+        conceptInput.focus();
+    }
 }); 
