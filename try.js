@@ -338,8 +338,13 @@ document.addEventListener('DOMContentLoaded', function () {
         
         itemDiv.appendChild(buttonsDiv);
         
-        // Add item to trace output
-        traceOutput.appendChild(itemDiv);
+        // Insert item BEFORE the copy-all container if it exists
+        const copyAllContainer = traceOutput.querySelector('.copy-all-container');
+        if (copyAllContainer) {
+            traceOutput.insertBefore(itemDiv, copyAllContainer);
+        } else {
+            traceOutput.appendChild(itemDiv);
+        }
         
         // Animate the item in with staggered delay
         setTimeout(() => {
@@ -436,6 +441,44 @@ document.addEventListener('DOMContentLoaded', function () {
         loadingState.style.display = 'none';
         
         if (streamedItems.length > 0 || streamedQuestions.length > 0) {
+            // Remove any existing copy-all container
+            const existingCopyAll = traceOutput.querySelector('.copy-all-container');
+            if (existingCopyAll) {
+                existingCopyAll.remove();
+            }
+            
+            // Create new copy-all container
+            const copyAllContainer = document.createElement('div');
+            copyAllContainer.className = 'copy-all-container';
+            
+            const copyAllBtn = document.createElement('button');
+            copyAllBtn.textContent = 'Copy All Results';
+            copyAllBtn.className = 'copy-all-button';
+            copyAllBtn.addEventListener('click', () => {
+                let allText = `Genealogy of: ${currentQuery}\n\n`;
+                
+                streamedItems.forEach((item, index) => {
+                    allText += `${index + 1}. ${item.title || 'Unknown'} (${item.year || 'Unknown year'})\n`;
+                    allText += `   ${item.claim || 'No description'}\n`;
+                    if (item.url || item.source) {
+                        allText += `   Source: ${item.url || item.source}\n`;
+                    }
+                    allText += '\n';
+                });
+                
+                if (streamedQuestions.length > 0) {
+                    allText += 'Research Questions:\n';
+                    streamedQuestions.forEach((question, index) => {
+                        allText += `${index + 1}. ${question}\n`;
+                    });
+                }
+                
+                copyToClipboard(allText);
+            });
+            
+            copyAllContainer.appendChild(copyAllBtn);
+            traceOutput.appendChild(copyAllContainer);
+            
             // Cache the complete response for future use
             const cacheData = {
                 genealogy: streamedItems,
@@ -650,28 +693,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Copy all results
-    copyAllButton.addEventListener('click', () => {
-        let allText = `Genealogy of: ${currentQuery}\n\n`;
-        
-        streamedItems.forEach((item, index) => {
-            allText += `${index + 1}. ${item.title || 'Unknown'} (${item.year || 'Unknown year'})\n`;
-            allText += `   ${item.claim || 'No description'}\n`;
-            if (item.url || item.source) {
-                allText += `   Source: ${item.url || item.source}\n`;
-            }
-            allText += '\n';
-        });
-        
-        if (streamedQuestions.length > 0) {
-            allText += 'Research Questions:\n';
-            streamedQuestions.forEach((question, index) => {
-                allText += `${index + 1}. ${question}\n`;
-            });
-        }
-        
-        copyToClipboard(allText);
-    });
+    // Remove the old copy all button event listener since we're creating it dynamically
+    const oldCopyAllButton = document.getElementById('copy-all-button');
+    if (oldCopyAllButton) {
+        oldCopyAllButton.style.display = 'none'; // Hide the static button
+    }
 
     // Retry button
     retryButton.addEventListener('click', () => {
