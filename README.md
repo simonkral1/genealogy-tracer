@@ -4,6 +4,16 @@
   <img src="icons/logo_final.png" alt="Concept Tracer Logo" width="200"/>
 </p>
 
+## 🌐 Try Online
+
+**[Visit the Concept Tracer Website](https://genealogy-ai.github.io/)**
+
+- **Try the Web Version**: Experience Concept Tracer directly in your browser
+- **Learn More**: Explore features and read about the genealogical method
+- **Download Extension**: Get the Chrome extension for seamless integration
+
+The website features the same scholarly aesthetic as the extension, inspired by the Library of Babel, with a clean interface for tracing concepts without needing to install anything.
+
 ## Truth is a Slippery Idea
 
 Many thinkers have problematized truth, and dogmatic claims to "truth" have often served as roadblocks for thought. Nietzsche developed a powerful response: the genealogical method. This is not a search for static facts, but a historical uncovering of the origins, contingencies, and power struggles behind the concepts we use unconsciously.

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Try Concept Tracer Online</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon16.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="icons/icon48.png">
+    <link rel="icon" type="image/png" sizes="128x128" href="icons/icon128.png">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-section">
+                <img src="icons/icon128.png" alt="Concept Tracer" class="main-logo">
+                <h1>Concept Tracer</h1>
+            </div>
+            <nav>
+                <a href="index.html">Home</a>
+                <a href="index.html#about">About</a>
+                <a href="index.html#features">Features</a>
+                <a href="index.html#download">Download</a>
+            </nav>
+        </header>
+
+        <main class="try-main">
+            <div class="try-interface">
+                <div class="input-section">
+                    <h2>Trace a Concept</h2>
+                    <div class="input-container">
+                        <input type="text" id="concept-input" placeholder="Enter a concept, idea, or text to trace..." />
+                        <button id="trace-button">Trace Genealogy</button>
+                    </div>
+                    <div class="examples">
+                        <p>Try examples:</p>
+                        <div class="example-tags">
+                            <button class="example-tag" data-concept="natural selection">natural selection</button>
+                            <button class="example-tag" data-concept="machine learning">machine learning</button>
+                            <button class="example-tag" data-concept="quantum mechanics">quantum mechanics</button>
+                            <button class="example-tag" data-concept="democracy">democracy</button>
+                            <button class="example-tag" data-concept="existentialism">existentialism</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-section">
+                    <!-- Loading State -->
+                    <div id="loading-state" class="loading-state" style="display: none;">
+                        <div class="loading-content">
+                            <div class="loading-spinner"></div>
+                            <p id="loading-message">examining the archives...</p>
+                            <p id="progress-indicator" class="progress-text">consulting references and citations</p>
+                        </div>
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="error-state" class="error-state" style="display: none;">
+                        <h3>Unable to Complete Trace</h3>
+                        <p id="error-message">An error occurred while tracing the concept.</p>
+                        <button id="retry-button">Try Again</button>
+                    </div>
+
+                    <!-- Results Container -->
+                    <div id="results-container" class="results-container" style="display: none;">
+                        <div id="search-term-display" class="search-term-display">
+                            <h3>Genealogy of: <span id="search-term"></span></h3>
+                            <button id="copy-all-button" class="copy-all-button">Copy All Results</button>
+                        </div>
+
+                        <div class="trace-container">
+                            <div class="trace-items">
+                                <div id="trace-output" class="trace-output"></div>
+                            </div>
+                            <div id="timeline" class="timeline">
+                                <div class="timeline-line"></div>
+                            </div>
+                        </div>
+
+                        <div id="questions-section" class="questions-section" style="display: none;">
+                            <div id="questions-header" class="questions-header">
+                                <h2>Research Questions</h2>
+                            </div>
+                            <div id="questions-content" class="questions-content">
+                                <ul id="questions-list"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <div class="footer-content">
+                <div class="footer-text">
+                    <p>"Each concept carries within it the echoes of every mind that has contemplated it."</p>
+                </div>
+                <div class="footer-links">
+                    <a href="index.html">Home</a>
+                    <a href="https://github.com/genealogy-ai">GitHub</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="try.js"></script>
+</body>
+</html> 
