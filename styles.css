@@ -820,10 +820,12 @@ code {
     padding: var(--spacing-xxl) var(--spacing-md);
 }
 
-.about-text-long {
-    max-width: 100%;
-    width: 100%;
+.about-main .about-content {
+    display: block;
+    grid-template-columns: none;
 }
+
+
 
 .about-hero {
     text-align: center;
@@ -846,7 +848,10 @@ code {
 
 .about-text-long {
     margin-bottom: var(--spacing-xxl);
-    width: 100%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
 }
 
 .about-text-long p {
@@ -855,7 +860,6 @@ code {
     line-height: 1.8;
     text-align: left;
     max-width: 100%;
-    width: 100%;
 }
 
 .about-features {
