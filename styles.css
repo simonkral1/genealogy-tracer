@@ -839,6 +839,8 @@ code {
     margin-bottom: var(--spacing-xl);
     color: var(--color-text);
     line-height: 1.8;
+    text-align: left;
+    max-width: 100%;
 }
 
 .about-features {
