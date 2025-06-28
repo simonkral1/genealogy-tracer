@@ -832,13 +832,18 @@ code {
 }
 
 .about-text-long p {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
     color: var(--color-text);
     line-height: 1.8;
 }
 
+.about-features {
+    margin-top: var(--spacing-xxl);
+}
+
 .about-features h2 {
     margin-bottom: var(--spacing-lg);
+    text-align: center;
 }
 
 .features-grid {
