@@ -693,6 +693,11 @@ code {
     margin-right: 18%;
 }
 
+.trace-output {
+    display: block;
+    min-height: 50px;
+}
+
 .timeline {
     position: absolute;
     right: 0;
@@ -817,6 +822,7 @@ code {
 
 .about-text-long {
     max-width: 100%;
+    width: 100%;
 }
 
 .about-hero {
@@ -840,6 +846,7 @@ code {
 
 .about-text-long {
     margin-bottom: var(--spacing-xxl);
+    width: 100%;
 }
 
 .about-text-long p {
@@ -848,6 +855,7 @@ code {
     line-height: 1.8;
     text-align: left;
     max-width: 100%;
+    width: 100%;
 }
 
 .about-features {

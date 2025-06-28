@@ -4,7 +4,7 @@
   <img src="icons/logo_final.png" alt="Concept Tracer Logo" width="200"/>
 </p>
 
-## 🌐 Try Online
+## 🌐 Trace Online
 
 **[Visit the Concept Tracer Website](https://genealogy-ai.github.io/)**
 

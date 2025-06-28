@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentQuery = '';
     let streamedItems = [];
     let streamedQuestions = [];
+    let isStreaming = false; // Add flag to track streaming state
     let traceStats = {
         itemCount: 0,
         questionCount: 0,
@@ -263,6 +264,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Add genealogy item to display - EXACT COPY FROM WORKING EXTENSION
     function addGenealogyItem(item) {
+        // Check if trace output exists
+        if (!traceOutput) {
+            return;
+        }
+        
         // Hide loading status once first item appears - CRITICAL!
         loadingState.style.display = 'none';
         resultsContainer.style.display = 'block';
@@ -437,8 +443,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function completeStreaming() {
+        // Clear streaming flag
+        isStreaming = false;
+        
         // Hide loading state when streaming completes
         loadingState.style.display = 'none';
+        
+        // Make sure results container is visible
+        resultsContainer.style.display = 'block';
+        
+        // Double-check that trace output is visible
+        if (traceOutput) {
+            traceOutput.style.display = 'block';
+        }
         
         if (streamedItems.length > 0 || streamedQuestions.length > 0) {
             // Remove any existing copy-all container
@@ -446,6 +463,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (existingCopyAll) {
                 existingCopyAll.remove();
             }
+            
+            // Force all trace items to be visible
+            const allTraceItems = traceOutput.querySelectorAll('.trace-item');
+            allTraceItems.forEach(item => {
+                item.style.display = 'flex'; // Ensure items are displayed
+                item.style.opacity = '1'; // Ensure opacity is set
+            });
             
             // Create new copy-all container
             const copyAllContainer = document.createElement('div');
@@ -493,12 +517,27 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Update timeline positions after all items are loaded
         setTimeout(updateTimelinePositions, 100);
+        
+        // Final safety check - ensure all items are visible
+        setTimeout(() => {
+            const finalItems = traceOutput.querySelectorAll('.trace-item');
+            finalItems.forEach(item => {
+                if (item.style.display === 'none' || window.getComputedStyle(item).display === 'none') {
+                    item.style.display = 'flex';
+                }
+            });
+        }, 500);
     }
 
     // Main trace function
     async function performTrace(concept) {
         if (!concept.trim()) {
             showError('Please enter a concept to trace.');
+            return;
+        }
+
+        // Prevent multiple simultaneous traces
+        if (isStreaming) {
             return;
         }
 
@@ -527,6 +566,9 @@ document.addEventListener('DOMContentLoaded', function () {
             displayCachedResults(cachedResponse);
             return;
         }
+
+        // Set streaming flag
+        isStreaming = true;
 
         // Disable trace button
         traceButton.disabled = true;
@@ -592,8 +634,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                     
                                 case 'genealogy_item':
                                     if (streamCompleted) break;
-                                    addGenealogyItem(data);
                                     streamedItems.push(data);
+                                    addGenealogyItem(data);
                                     break;
                                     
                                 case 'section':
@@ -619,6 +661,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 case 'error':
                                     if (!streamCompleted) {
                                         streamCompleted = true;
+                                        isStreaming = false;
                                         showError(data.message);
                                     }
                                     return;
@@ -639,6 +682,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         } catch (error) {
             console.error('Trace error:', error);
+            isStreaming = false;
             showError(error.message || 'An error occurred while tracing the concept.');
         } finally {
             traceButton.disabled = false;
@@ -647,17 +691,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function displayCachedResults(cachedData) {
+        // Make sure container is visible
+        showResults();
+        
         if (cachedData.genealogy && cachedData.genealogy.length > 0) {
             cachedData.genealogy.forEach(item => {
-                streamedItems.push(item);
                 addGenealogyItem(item);
             });
             
+            // Store the items in streamedItems for consistency
+            streamedItems = [...cachedData.genealogy];
+            
             if (cachedData.questions && cachedData.questions.length > 0) {
                 cachedData.questions.forEach(question => {
-                    streamedQuestions.push(question);
                     addQuestion(question);
                 });
+                
+                // Store questions in streamedQuestions
+                streamedQuestions = [...cachedData.questions];
             }
             
             // Complete the streaming process for cached results
