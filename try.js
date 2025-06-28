@@ -156,8 +156,10 @@ document.addEventListener('DOMContentLoaded', function () {
         errorState.style.display = 'none';
         resultsContainer.style.display = 'block';
         
-        if (searchTermDisplay && currentQuery) {
-            searchTermDisplay.textContent = currentQuery;
+        // Update the search term display
+        const searchTermSpan = document.getElementById('search-term');
+        if (searchTermSpan && currentQuery) {
+            searchTermSpan.textContent = currentQuery;
         }
     }
 
@@ -264,6 +266,12 @@ document.addEventListener('DOMContentLoaded', function () {
         // Hide loading status once first item appears - CRITICAL!
         loadingState.style.display = 'none';
         resultsContainer.style.display = 'block';
+        
+        // Update the search term display
+        const searchTermSpan = document.getElementById('search-term');
+        if (searchTermSpan && currentQuery) {
+            searchTermSpan.textContent = currentQuery;
+        }
         
         // Update stats
         traceStats.itemCount++;

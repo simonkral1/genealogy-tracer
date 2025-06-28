@@ -130,17 +130,16 @@
         <footer>
             <div class="footer-content">
                 <div class="footer-text">
-                    <p id="rotating-quote">"There are no facts, only interpretations." <em>— Nietzsche</em></p>
+                    <p id="random-quote">"There are no facts, only interpretations." <em>— Nietzsche</em></p>
                 </div>
                 <div class="footer-links">
                     <a href="https://github.com/genealogy-ai">GitHub</a>
-                    <a href="try.html">Try Online</a>
                 </div>
             </div>
         </footer>
 
         <script>
-            // Rotating quotes
+            // Random quote on page load
             const quotes = [
                 '"There are no facts, only interpretations." <em>— Nietzsche</em>',
                 '"The cause of the origin of a thing and its eventual utility, its actual employment and place in a system of purposes, lie worlds apart." <em>— Nietzsche</em>',
@@ -149,21 +148,10 @@
                 '"I have tried to define this blank space from which I speak, and which is slowly taking shape in a discourse that I still feel to be so precarious and so unsure." <em>— Foucault</em>'
             ];
             
-            let currentQuoteIndex = 0;
-            const quoteElement = document.getElementById('rotating-quote');
-            
-            function rotateQuote() {
-                currentQuoteIndex = (currentQuoteIndex + 1) % quotes.length;
-                quoteElement.style.opacity = '0';
-                
-                setTimeout(() => {
-                    quoteElement.innerHTML = quotes[currentQuoteIndex];
-                    quoteElement.style.opacity = '1';
-                }, 300);
-            }
-            
-            // Rotate quote every 8 seconds
-            setInterval(rotateQuote, 8000);
+            // Display random quote on page load
+            const quoteElement = document.getElementById('random-quote');
+            const randomIndex = Math.floor(Math.random() * quotes.length);
+            quoteElement.innerHTML = quotes[randomIndex];
         </script>
     </div>
 </body>

@@ -803,9 +803,13 @@ code {
 
 /* About Page */
 .about-main {
-    max-width: 800px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: var(--spacing-xxl) var(--spacing-md);
+}
+
+.about-text-long {
+    max-width: 100%;
 }
 
 .about-hero {
@@ -907,9 +911,7 @@ footer {
     font-size: 12px;
 }
 
-#rotating-quote {
-    transition: opacity 0.3s ease;
-}
+
 
 .footer-quotes {
     display: flex;
