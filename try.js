@@ -282,8 +282,9 @@ document.addEventListener('DOMContentLoaded', function () {
         itemDiv.appendChild(claimSpan);
         
         // Add source link if available
-        if (item.source) {
-            const safeUrl = createSafeUrl(item.source);
+        if (item.url || item.source) {
+            const sourceUrl = item.url || item.source;
+            const safeUrl = createSafeUrl(sourceUrl);
             if (safeUrl) {
                 const sourceSpan = document.createElement('span');
                 sourceSpan.className = 'trace-item-line';
@@ -450,14 +451,12 @@ document.addEventListener('DOMContentLoaded', function () {
         showLoading();
 
         try {
-            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/trace', {
+            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/stream', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'text/plain',
                 },
-                body: JSON.stringify({
-                    text: currentQuery
-                })
+                body: currentQuery
             });
 
             if (!response.ok) {
@@ -483,35 +482,63 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (done) break;
                 
                 buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
                 
-                for (const line of lines) {
-                    if (line.trim() === '') continue;
-                    
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const jsonData = JSON.parse(line.slice(6));
-                            
-                            if (jsonData.type === 'genealogy_item') {
-                                genealogyItems.push(jsonData.data);
-                                streamedItems.push(jsonData.data);
-                                addGenealogyItem(jsonData.data);
-                            } else if (jsonData.type === 'question') {
-                                questions.push(jsonData.data.question);
-                                streamedQuestions.push(jsonData.data.question);
-                                addQuestion(jsonData.data.question);
-                            } else if (jsonData.type === 'complete') {
+                // Process complete SSE events delineated by a blank line ("\n\n")
+                let eventEnd;
+                while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
+                    const rawEvent = buffer.slice(0, eventEnd).trim();
+                    buffer = buffer.slice(eventEnd + 2);
+                    if (!rawEvent.startsWith('data:')) continue;
+                    try {
+                        const jsonStr = rawEvent.slice(5).trim();
+                        if (jsonStr === '') continue;
+                        const data = JSON.parse(jsonStr);
+                        
+                        switch (data.type) {
+                            case 'status':
+                                // Map status messages to scholarly phrases
+                                const scholarlyPhrases = {
+                                    'Querying Wikipedia': 'Searching bibliographic databases',
+                                    'Calling Claude': 'Consulting historical records',
+                                    'Processing genealogy': 'Tracing intellectual lineages',
+                                    'Finalizing results': 'Compiling scholarly findings'
+                                };
+                                const scholarlyMessage = scholarlyPhrases[data.message] || 'Scouring the archives';
+                                showLoading(scholarlyMessage);
+                                break;
+                                
+                            case 'genealogy_item':
+                                genealogyItems.push(data);
+                                streamedItems.push(data);
+                                addGenealogyItem(data);
+                                break;
+                                
+                            case 'section':
+                                if (data.section === 'questions') {
+                                    questionsSection.style.display = 'block';
+                                }
+                                break;
+                                
+                            case 'question':
+                                questions.push(data.text);
+                                streamedQuestions.push(data.text);
+                                addQuestion(data.text);
+                                break;
+                                
+                            case 'complete':
                                 // Cache the complete response
                                 setCachedResponse(currentQuery, {
                                     genealogy: genealogyItems,
                                     questions: questions
                                 });
-                                break;
-                            }
-                        } catch (parseError) {
-                            console.error('JSON parse error:', parseError);
+                                return;
+                                
+                            case 'error':
+                                showError(data.message);
+                                return;
                         }
+                    } catch (parseError) {
+                        console.error('Error parsing stream data:', parseError, 'Event:', rawEvent);
                     }
                 }
             }
@@ -581,8 +608,8 @@ document.addEventListener('DOMContentLoaded', function () {
         streamedItems.forEach((item, index) => {
             allText += `${index + 1}. ${item.title || 'Unknown'} (${item.year || 'Unknown year'})\n`;
             allText += `   ${item.claim || 'No description'}\n`;
-            if (item.source) {
-                allText += `   Source: ${item.source}\n`;
+            if (item.url || item.source) {
+                allText += `   Source: ${item.url || item.source}\n`;
             }
             allText += '\n';
         });
