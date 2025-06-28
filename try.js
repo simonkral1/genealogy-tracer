@@ -259,86 +259,90 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 3000);
     }
 
-    // Add genealogy item to display
+    // Add genealogy item to display - EXACT COPY FROM WORKING EXTENSION
     function addGenealogyItem(item) {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'trace-item';
-        
-        // Create the item content
-        const titleSpan = document.createElement('span');
-        titleSpan.className = 'trace-item-line';
-        titleSpan.innerHTML = `<strong>${sanitizeText(item.title || 'Unknown')}</strong>`;
-        
-        const yearSpan = document.createElement('span');
-        yearSpan.className = 'trace-item-line';
-        yearSpan.innerHTML = `<span style="color: #666;">${sanitizeText(item.year ? item.year.toString() : 'Unknown year')}</span>`;
-        
-        const claimSpan = document.createElement('span');
-        claimSpan.className = 'trace-item-line';
-        claimSpan.textContent = item.claim || 'No description available';
-        
-        itemDiv.appendChild(titleSpan);
-        itemDiv.appendChild(yearSpan);
-        itemDiv.appendChild(claimSpan);
-        
-        // Add source link if available
-        if (item.url || item.source) {
-            const sourceUrl = item.url || item.source;
-            const safeUrl = createSafeUrl(sourceUrl);
-            if (safeUrl) {
-                const sourceSpan = document.createElement('span');
-                sourceSpan.className = 'trace-item-line';
-                const sourceLink = document.createElement('a');
-                sourceLink.href = safeUrl;
-                sourceLink.target = '_blank';
-                sourceLink.rel = 'noopener noreferrer';
-                sourceLink.textContent = 'Source';
-                sourceSpan.appendChild(sourceLink);
-                itemDiv.appendChild(sourceSpan);
-            }
-        }
-        
-        // Add buttons
-        const buttonsDiv = document.createElement('div');
-        buttonsDiv.className = 'item-buttons';
-        
-        const traceButton = document.createElement('button');
-        traceButton.className = 'trace-this-button';
-        traceButton.textContent = 'trace this';
-        traceButton.onclick = () => {
-            if (item.title) {
-                performTrace(item.title);
-            }
-        };
-        
-        const expandButton = document.createElement('button');
-        expandButton.className = 'expand-button';
-        expandButton.textContent = 'expand';
-        expandButton.onclick = () => expandItem(expandButton, item);
-        
-        buttonsDiv.appendChild(traceButton);
-        buttonsDiv.appendChild(expandButton);
-        itemDiv.appendChild(buttonsDiv);
-        
-        traceOutput.appendChild(itemDiv);
-        
-        // Add to timeline
-        if (item.year && !isNaN(parseInt(item.year))) {
-            addTimelineItem(parseInt(item.year), streamedItems.length);
-        }
+        // Hide loading status once first item appears - CRITICAL!
+        loadingState.style.display = 'none';
+        resultsContainer.style.display = 'block';
         
         // Update stats
-        if (item.year && !isNaN(parseInt(item.year))) {
-            const year = parseInt(item.year);
-            if (!traceStats.earliestYear || year < traceStats.earliestYear) {
+        traceStats.itemCount++;
+        
+        // Parse year for stats tracking
+        const year = parseInt(item.year);
+        if (!isNaN(year)) {
+            if (traceStats.earliestYear === null || year < traceStats.earliestYear) {
                 traceStats.earliestYear = year;
             }
-            if (!traceStats.latestYear || year > traceStats.latestYear) {
+            if (traceStats.latestYear === null || year > traceStats.latestYear) {
                 traceStats.latestYear = year;
             }
         }
         
-        traceStats.itemCount++;
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'trace-item';
+        itemDiv.style.opacity = '0';
+        itemDiv.style.transform = 'translateY(20px)';
+        
+        const textContentDiv = document.createElement('div');
+        textContentDiv.className = 'trace-item-line';
+
+        const titleStrong = document.createElement('strong');
+        titleStrong.textContent = item.title;
+        textContentDiv.appendChild(titleStrong);
+        
+        const yearSpan = document.createElement('span');
+        yearSpan.textContent = ` (${item.year}) `;
+        textContentDiv.appendChild(yearSpan);
+
+        if (item.url && item.url.toLowerCase() !== 'n/a' && item.url.toLowerCase() !== 'none' && item.url.trim() !== '') {
+            const safeUrl = createSafeUrl(item.url);
+            if (safeUrl) {
+                const link = document.createElement('a');
+                link.href = safeUrl;
+                link.textContent = '[source]';
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                textContentDiv.appendChild(link);
+            }
+        }
+        
+        const claimSpan = document.createElement('span');
+        claimSpan.textContent = ` — ${item.claim}`;
+        textContentDiv.appendChild(claimSpan);
+        itemDiv.appendChild(textContentDiv);
+
+        // Create buttons container
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'item-buttons';
+        
+        const traceButton = document.createElement('button');
+        traceButton.textContent = 'trace';
+        traceButton.className = 'trace-this-button';
+        traceButton.addEventListener('click', () => performTrace(item.title));
+        buttonsDiv.appendChild(traceButton);
+        
+        const expandButton = document.createElement('button');
+        expandButton.textContent = 'expand';
+        expandButton.className = 'expand-button';
+        expandButton.onclick = () => expandItem(expandButton, item);
+        buttonsDiv.appendChild(expandButton);
+        
+        itemDiv.appendChild(buttonsDiv);
+        traceOutput.appendChild(itemDiv);
+        
+        // Animate the item in with staggered delay
+        setTimeout(() => {
+            itemDiv.style.transition = 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            itemDiv.style.opacity = '1';
+            itemDiv.style.transform = 'translateY(0)';
+        }, traceStats.itemCount * 100);
+        
+        // Add timeline item
+        addTimelineItem(item.year, traceStats.itemCount);
+        
+        // Update timeline positions progressively
+        setTimeout(updateTimelinePositions, 100);
     }
 
     // Expand item functionality
@@ -399,16 +403,39 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Add question to display
     function addQuestion(questionText) {
-        const questionLi = document.createElement('li');
-        questionLi.textContent = questionText;
-        questionsList.appendChild(questionLi);
-        
+        // Update stats
         traceStats.questionCount++;
         
-        // Show questions section if hidden
-        if (questionsSection.style.display === 'none') {
-            questionsSection.style.display = 'block';
+        const li = document.createElement('li');
+        li.textContent = questionText;
+        li.style.opacity = '0';
+        li.style.transform = 'translateX(-10px)';
+        questionsList.appendChild(li);
+        
+        setTimeout(() => {
+            li.style.transition = 'all 0.3s ease';
+            li.style.opacity = '1';
+            li.style.transform = 'translateX(0)';
+        }, traceStats.questionCount * 50);
+        
+        questionsSection.style.display = 'block';
+    }
+
+    function completeStreaming() {
+        // Hide loading state when streaming completes
+        loadingState.style.display = 'none';
+        
+        if (streamedItems.length > 0 || streamedQuestions.length > 0) {
+            // Cache the complete response for future use
+            const cacheData = {
+                genealogy: streamedItems,
+                questions: streamedQuestions
+            };
+            setCachedResponse(currentQuery, cacheData);
         }
+        
+        // Update timeline positions after all items are loaded
+        setTimeout(updateTimelinePositions, 100);
     }
 
     // Main trace function
@@ -467,136 +494,75 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error('No response body');
             }
 
-            // Handle streaming response
+            // Handle streaming response - EXACT COPY FROM WORKING EXTENSION
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
-            let genealogyItems = [];
-            let questions = [];
 
-            while (true) {
-                const { done, value } = await reader.read();
-                
-                if (done) break;
-                
-                buffer += decoder.decode(value, { stream: true });
-                console.log('Raw buffer chunk:', buffer);
-                
-                // Process complete SSE events delineated by a blank line ("\n\n")  
-                let eventEnd;
-                while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
-                    const rawEvent = buffer.slice(0, eventEnd).trim();
-                    buffer = buffer.slice(eventEnd + 2);
-                    console.log('Raw event:', rawEvent);
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
                     
-                    if (!rawEvent.startsWith('data:')) continue;
-                    try {
-                        const jsonStr = rawEvent.slice(5).trim();
-                        console.log('JSON string:', jsonStr);
-                        if (jsonStr === '') continue;
-                        const data = JSON.parse(jsonStr);
-                        
-                        console.log('Parsed data:', data.type, data);
-                        
-                        switch (data.type) {
-                            case 'status':
-                                // Map status messages to scholarly phrases
-                                const scholarlyPhrases = {
-                                    'Querying Wikipedia': 'Searching bibliographic databases',
-                                    'Calling Claude': 'Consulting historical records',
-                                    'Processing genealogy': 'Tracing intellectual lineages',
-                                    'Finalizing results': 'Compiling scholarly findings'
-                                };
-                                const scholarlyMessage = scholarlyPhrases[data.message] || 'Scouring the archives';
-                                showLoading(scholarlyMessage);
-                                break;
-                                
-                            case 'genealogy_item':
-                                // Show results container on first item
-                                if (genealogyItems.length === 0) {
-                                    showResults();
-                                }
-                                genealogyItems.push(data);
-                                streamedItems.push(data);
-                                addGenealogyItem(data);
-                                break;
-                                
-                            case 'section':
-                                if (data.section === 'questions') {
-                                    questionsSection.style.display = 'block';
-                                }
-                                break;
-                                
-                            case 'question':
-                                // Show questions section if not already visible
-                                if (questionsSection.style.display === 'none') {
-                                    questionsSection.style.display = 'block';
-                                }
-                                questions.push(data.text);
-                                streamedQuestions.push(data.text);
-                                addQuestion(data.text);
-                                break;
-                                
-                            case 'complete':
-                                // Cache the complete response
-                                setCachedResponse(currentQuery, {
-                                    genealogy: genealogyItems,
-                                    questions: questions
-                                });
-                                return;
-                                
-                            case 'error':
-                                showError(data.message);
-                                return;
-                        }
-                    } catch (parseError) {
-                        console.error('Error parsing stream data:', parseError, 'Event:', rawEvent);
-                    }
-                }
-                
-                // Alternative parsing: try line-by-line parsing as fallback
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || ''; // Keep incomplete line in buffer
-                
-                for (const line of lines) {
-                    if (line.trim() === '') continue;
-                    console.log('Processing line:', line);
+                    if (done) break;
                     
-                    if (line.startsWith('data: ')) {
+                    const chunk = decoder.decode(value, { stream: true });
+                    buffer += chunk;
+                    
+                    // Process complete SSE events delineated by a blank line ("\n\n")
+                    let eventEnd;
+                    while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
+                        const rawEvent = buffer.slice(0, eventEnd).trim();
+                        buffer = buffer.slice(eventEnd + 2);
+                        if (!rawEvent.startsWith('data:')) continue;
                         try {
-                            const jsonData = JSON.parse(line.slice(6));
-                            console.log('Line-parsed data:', jsonData.type, jsonData);
+                            const jsonStr = rawEvent.slice(5).trim();
+                            if (jsonStr === '') continue;
+                            const data = JSON.parse(jsonStr);
                             
-                            // Process the same way as above
-                            switch (jsonData.type) {
-                                case 'genealogy_item':
-                                    if (genealogyItems.length === 0) {
-                                        showResults();
-                                    }
-                                    genealogyItems.push(jsonData);
-                                    streamedItems.push(jsonData);
-                                    addGenealogyItem(jsonData);
+                            switch (data.type) {
+                                case 'status':
+                                    // Map status messages to scholarly phrases
+                                    const scholarlyPhrases = {
+                                        'Querying Wikipedia': 'Searching bibliographic databases',
+                                        'Calling Claude': 'Consulting historical records',
+                                        'Processing genealogy': 'Tracing intellectual lineages',
+                                        'Finalizing results': 'Compiling scholarly findings'
+                                    };
+                                    const scholarlyMessage = scholarlyPhrases[data.message] || 'Scouring the archives';
+                                    showLoading(scholarlyMessage);
                                     break;
-                                case 'question':
-                                    if (questionsSection.style.display === 'none') {
+                                    
+                                case 'genealogy_item':
+                                    addGenealogyItem(data);
+                                    streamedItems.push(data);
+                                    break;
+                                    
+                                case 'section':
+                                    if (data.section === 'questions') {
                                         questionsSection.style.display = 'block';
                                     }
-                                    questions.push(jsonData.text);
-                                    streamedQuestions.push(jsonData.text);
-                                    addQuestion(jsonData.text);
                                     break;
+                                    
+                                case 'question':
+                                    addQuestion(data.text);
+                                    streamedQuestions.push(data.text);
+                                    break;
+                                    
                                 case 'complete':
-                                    setCachedResponse(currentQuery, {
-                                        genealogy: genealogyItems,
-                                        questions: questions
-                                    });
+                                    completeStreaming();
+                                    return;
+                                    
+                                case 'error':
+                                    showError(data.message);
                                     return;
                             }
-                        } catch (lineParseError) {
-                            console.error('Error parsing line:', lineParseError, 'Line:', line);
+                        } catch (parseError) {
+                            console.error('Error parsing stream data:', parseError, 'Event:', rawEvent);
                         }
                     }
                 }
+            } finally {
+                reader.releaseLock();
             }
 
             // Update timeline positions after all items are added
@@ -613,15 +579,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function displayCachedResults(cachedData) {
         if (cachedData.genealogy && cachedData.genealogy.length > 0) {
-            showResults();
-            
             cachedData.genealogy.forEach(item => {
                 streamedItems.push(item);
                 addGenealogyItem(item);
             });
             
-            if (cachedData.questions) {
-                questionsSection.style.display = 'block';
+            if (cachedData.questions && cachedData.questions.length > 0) {
                 cachedData.questions.forEach(question => {
                     streamedQuestions.push(question);
                     addQuestion(question);
