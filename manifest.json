@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Concept Tracer",
-  "version": "0.3",
+  "version": "0.4",
   "description": "Trace the genealogy of selected text using AI",
   "permissions": [
     "activeTab",

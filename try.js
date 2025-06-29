@@ -534,43 +534,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Main trace function
-    async function performTrace(concept) {
-        if (!concept.trim()) {
-            showError('Please enter a concept to trace.');
-            return;
-        }
-
-        // Prevent multiple simultaneous traces
-        if (isStreaming) {
-            return;
-        }
-
-        currentQuery = concept.trim();
-        
-        // Clear previous results
-        traceOutput.innerHTML = '';
-        questionsList.innerHTML = '';
-        if (timeline) {
-            const timelineItems = timeline.querySelectorAll('.timeline-item');
-            timelineItems.forEach(item => item.remove());
-        }
-        questionsSection.style.display = 'none';
-        streamedItems = [];
-        streamedQuestions = [];
-        traceStats = {
-            itemCount: 0,
-            questionCount: 0,
-            earliestYear: null,
-            latestYear: null
-        };
-
-        // Check cache first
-        const cachedResponse = getCachedResponse(currentQuery);
-        if (cachedResponse) {
-            displayCachedResults(cachedResponse);
-            return;
-        }
-
+    async function performTraceApiCall() {
         // Set streaming flag
         isStreaming = true;
 
@@ -694,6 +658,47 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    async function performTrace(concept) {
+        if (!concept.trim()) {
+            showError('Please enter a concept to trace.');
+            return;
+        }
+
+        // Prevent multiple simultaneous traces
+        if (isStreaming) {
+            return;
+        }
+
+        currentQuery = concept.trim();
+        
+        // Clear previous results
+        traceOutput.innerHTML = '';
+        questionsList.innerHTML = '';
+        if (timeline) {
+            const timelineItems = timeline.querySelectorAll('.timeline-item');
+            timelineItems.forEach(item => item.remove());
+        }
+        questionsSection.style.display = 'none';
+        streamedItems = [];
+        streamedQuestions = [];
+        traceStats = {
+            itemCount: 0,
+            questionCount: 0,
+            earliestYear: null,
+            latestYear: null
+        };
+
+        // Check cache first
+        const cachedResponse = getCachedResponse(currentQuery);
+        if (cachedResponse && cachedResponse.genealogy && cachedResponse.genealogy.length > 0) {
+            displayCachedResults(cachedResponse);
+            return;
+        }
+
+        // Make API call
+        await performTraceApiCall();
+    }
+
     function displayCachedResults(cachedData) {
         // Make sure container is visible
         showResults();
@@ -718,7 +723,13 @@ document.addEventListener('DOMContentLoaded', function () {
             // Complete the streaming process for cached results
             completeStreaming();
         } else {
-            showError('No cached results found');
+            // If cached data is invalid, clear it and make a fresh request
+            const cacheKey = `concept_tracer_${currentQuery.toLowerCase().trim()}`;
+            localStorage.removeItem(cacheKey);
+            console.log('Removed invalid cache entry for:', currentQuery);
+            
+            // Make a fresh API call
+            performTraceApiCall();
         }
     }
 
