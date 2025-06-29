@@ -202,7 +202,12 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       console.log('✨ Expand response received');
-      return responseData.content;
+      
+      // Extract content from <explanation> tags if present
+      const explanationMatch = responseData.content.match(/<explanation>([\s\S]*?)<\/explanation>/);
+      const cleanContent = explanationMatch && explanationMatch[1] ? explanationMatch[1].trim() : responseData.content.trim();
+      
+      return cleanContent;
       
     } catch (error) {
       console.error('💥 Expand call failed:', error);

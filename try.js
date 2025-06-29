@@ -393,10 +393,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const responseData = await response.json();
             
             if (responseData.content) {
+                // Extract content from <explanation> tags if present
+                const explanationMatch = responseData.content.match(/<explanation>([\s\S]*?)<\/explanation>/);
+                const cleanContent = explanationMatch && explanationMatch[1] ? explanationMatch[1].trim() : responseData.content.trim();
+                
                 // Create expanded content div
                 const expandedDiv = document.createElement('div');
                 expandedDiv.className = 'expanded-content visible';
-                expandedDiv.textContent = responseData.content;
+                expandedDiv.textContent = cleanContent;
                 
                 // Insert after the buttons
                 const traceItem = button.closest('.trace-item');
