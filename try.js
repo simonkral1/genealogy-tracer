@@ -881,6 +881,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             const jsonStr = rawEvent.slice(5).trim();
                             if (jsonStr === '') continue;
                             const data = JSON.parse(jsonStr);
+                            console.log('🔄 Reinterpret: Received data:', data);
                             
                             switch (data.type) {
                                 case 'status':
@@ -896,6 +897,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                     
                                 case 'genealogy_item':
                                     if (streamCompleted) break;
+                                    console.log('📝 Reinterpret: Adding genealogy item:', data);
                                     streamedItems.push(data);
                                     addGenealogyItem(data);
                                     break;
@@ -963,5 +965,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         console.log('All concept tracer cache cleared');
+    };
+    
+    // Clear machine learning cache specifically for testing
+    window.clearMLCache = function() {
+        localStorage.removeItem('concept_tracer_machine learning');
+        console.log('Cleared machine learning cache');
     };
 }); 

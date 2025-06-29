@@ -563,6 +563,13 @@ document.addEventListener('DOMContentLoaded', function () {
       copyAllBtn.addEventListener('click', () => copyToClipboard(allTraceText));
       copyAllContainer.appendChild(copyAllBtn);
       
+      // Add reinterpret button
+      const reinterpretBtn = document.createElement('button');
+      reinterpretBtn.textContent = 'reinterpret';
+      reinterpretBtn.className = 'copy-all-button'; // Use same styling as copy button
+      reinterpretBtn.addEventListener('click', () => performReinterpret());
+      copyAllContainer.appendChild(reinterpretBtn);
+      
       traceOutputDiv.appendChild(copyAllContainer);
 
       // Cache the complete response
@@ -688,6 +695,119 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (error) {
       console.error('Streaming error:', error);
       showError('Streaming error: ' + error.message);
+    }
+  }
+
+  async function performReinterpret() {
+    console.log('Starting reinterpret for:', currentTraceText);
+    
+    if (!currentTraceText) {
+      showError('No previous trace to reinterpret');
+      return;
+    }
+    
+    // Get current genealogy items in the format expected by worker
+    let existingGenealogy = [];
+    if (streamedItems.length > 0) {
+      existingGenealogy = streamedItems.map(item => ({
+        title: item.title,
+        year: item.year,
+        claim: item.claim,
+        url: item.url
+      }));
+    }
+    
+    if (existingGenealogy.length === 0) {
+      showError('No genealogy items found to reinterpret');
+      return;
+    }
+    
+    // Clear current results and reinitialize
+    initializeStreaming();
+    
+    try {
+      const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/reinterpret', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: currentTraceText,
+          existingGenealogy: existingGenealogy
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Worker error:', response.status, errorText);
+        showError(`Worker returned error ${response.status}: ${errorText}`);
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+          
+          // Process complete SSE events delineated by a blank line ("\n\n")
+          let eventEnd;
+          while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
+            const rawEvent = buffer.slice(0, eventEnd).trim();
+            buffer = buffer.slice(eventEnd + 2);
+            if (!rawEvent.startsWith('data:')) continue;
+            try {
+              const jsonStr = rawEvent.slice(5).trim();
+              if (jsonStr === '') continue;
+              const data = JSON.parse(jsonStr);
+              
+              switch (data.type) {
+                case 'status':
+                  const scholarlyMessage = data.message || 'Reinterpreting genealogy';
+                  showLoading(scholarlyMessage, true);
+                  break;
+                  
+                case 'genealogy_item':
+                  addGenealogyItem(data);
+                  break;
+                  
+                case 'section':
+                  if (data.section === 'questions') {
+                    showQuestionsSection();
+                  }
+                  break;
+                  
+                case 'question':
+                  addQuestion(data.text);
+                  break;
+                  
+                case 'complete':
+                  completeStreaming();
+                  return;
+                  
+                case 'error':
+                  showError(data.message);
+                  return;
+              }
+            } catch (parseError) {
+              console.error('Error parsing stream data:', parseError, 'Event:', rawEvent);
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+    } catch (error) {
+      console.error('Reinterpret streaming error:', error);
+      showError('Reinterpret streaming error: ' + error.message);
     }
   }
 

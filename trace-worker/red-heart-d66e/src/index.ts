@@ -63,29 +63,54 @@ export default {
 							// Prepare prompt
 							const prompt = `You are a brilliant intellectual historian tracing the genealogy of "${query}" with scholarly precision and creative insight.
 
-Construct a five-item genealogy revealing how this concept emerged, transformed, and continues to evolve. Each item should follow this format:
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+Construct a five-item genealogy revealing how this concept emerged, transformed, and continues to evolve.
 
 Guidelines:
 1. Focus on works that fundamentally shifted how people understood this concept
 2. Arrange chronologically, showing intellectual evolution and ruptures
-3. Each claim should reveal what made that work revolutionary for its time
-4. URLs should link to primary sources, key texts, or authoritative encyclopedic entries
+3. Each explanation should reveal what made that work revolutionary for its time
+4. Keep each explanation under 80 words - be concise and impactful
+5. URLs should link to primary sources, key texts, or authoritative encyclopedic entries
 Wikipedia references available: ${titles.join(", ")}
 
-After the genealogy, provide "Open Questions": 1-2 fundamental questions that remain unresolved and actively debated today about "${query}".
+Format your response using XML tags for easy parsing:
 
-Format your response exactly as:
 <genealogy>
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
 
-Open Questions:
-- [Question 1]
-- [Question 2]
+<questions>
+<question>Fundamental question 1 about ${query}</question>
+<question>Fundamental question 2 about ${query}</question>
+</questions>
 </genealogy>`;
 
 							// Inform client that we are about to call the language model
@@ -129,7 +154,6 @@ Open Questions:
 							const decoder = new TextDecoder();
 							let buffer = '';
 							let accumulator = '';
-							let readingQuestions = false;
 							const processedItems = new Set();
 							const processedQuestions = new Set();
 
@@ -150,33 +174,33 @@ Open Questions:
 												if (data.type === 'content_block_delta' && data.delta?.text) {
 													accumulator += data.delta.text;
 													
-													// Check for questions section first
-													if (accumulator.toLowerCase().includes('open questions:') && !readingQuestions) {
-														readingQuestions = true;
-														controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
-													}
-													
-													// Parse genealogy items (only if not in questions section)
-													if (!readingQuestions) {
-														// Look for complete genealogy items in the accumulator
-														// Match format: "Title (Year) [[URL]] — Claim"
-														const itemPattern = /([^(\n]+)\s*\(([^)]+)\)\s*\[\[([^\]]+)\]\]\s*—\s*([^.\n]+(?:\.[^.\n]*)?)\./g;
-														let match;
-														while ((match = itemPattern.exec(accumulator)) !== null) {
-															const [fullMatch, title, year, url, claim] = match;
-															const itemKey = `${title.trim()}_${year.trim()}`;
+													// Parse XML-formatted genealogy items
+													const itemMatches = [...accumulator.matchAll(/<item>([\s\S]*?)<\/item>/g)];
+													for (const itemMatch of itemMatches) {
+														const itemXml = itemMatch[1];
+														const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
+														const yearMatch = itemXml.match(/<year>(.*?)<\/year>/);
+														const urlMatch = itemXml.match(/<url>(.*?)<\/url>/);
+														const explanationMatch = itemXml.match(/<explanation>([\s\S]*?)<\/explanation>/);
+														
+														if (titleMatch && yearMatch && urlMatch && explanationMatch) {
+															const title = titleMatch[1].trim();
+															const year = yearMatch[1].trim();
+															const url = urlMatch[1].trim();
+															const explanation = explanationMatch[1].trim();
+															const itemKey = `${title}_${year}`;
 															
 															if (!processedItems.has(itemKey) && 
-																title.trim().length > 5 && 
-																claim.trim().length > 10) {
+																title.length > 3 && 
+																explanation.length > 5) {
 																processedItems.add(itemKey);
 																
 																const item = {
 																	type: "genealogy_item",
-																	title: title.trim(),
-																	year: year.trim(),
-																	url: url.trim(),
-																	claim: claim.trim()
+																	title: title,
+																	year: year,
+																	url: url,
+																	claim: explanation
 																};
 																
 																controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(item)}\n\n`));
@@ -184,34 +208,27 @@ Open Questions:
 														}
 													}
 													
-													// Parse questions (only if in questions section)
-													if (readingQuestions) {
-														// Split into lines and look for proper question format
-														const lines = accumulator.split('\n');
-														for (const line of lines) {
-															const trimmedLine = line.trim();
+													// Parse XML-formatted questions
+													const questionMatches = [...accumulator.matchAll(/<question>(.*?)<\/question>/g)];
+													for (const questionMatch of questionMatches) {
+														const questionText = questionMatch[1].trim();
+														
+														if (questionText.length > 30 && 
+															questionText.length < 400 && 
+															!processedQuestions.has(questionText.toLowerCase())) {
+															processedQuestions.add(questionText.toLowerCase());
 															
-															// Only match lines that start with "- " and contain a question mark
-															if (trimmedLine.startsWith('- ') && trimmedLine.includes('?')) {
-																const questionText = trimmedLine.substring(2).trim(); // Remove "- " prefix
-																
-																// Filter for valid questions
-																if (questionText.length > 30 && 
-																	questionText.length < 400 && 
-																	questionText.endsWith('?') &&
-																	!questionText.includes('[[') && 
-																	!questionText.includes('—') &&
-																	!questionText.includes('(') &&
-																	!questionText.toLowerCase().includes('thereby') && // Common in genealogy descriptions
-																	!questionText.toLowerCase().includes('establishing') && // Common in genealogy descriptions
-																	!questionText.toLowerCase().includes('demonstrat') && // Common in genealogy descriptions
-																	questionText.split(' ').length > 8 && // Must be substantial
-																	!processedQuestions.has(questionText)) {
-																	
-																	processedQuestions.add(questionText);
-																	controller.enqueue(new TextEncoder().encode(`data: {"type":"question","text":"${questionText.replace(/"/g, '\\"')}"}\n\n`));
-																}
+															// Send questions section signal first time we find questions
+															if (processedQuestions.size === 1) {
+																controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
 															}
+															
+															const question = {
+																type: "question",
+																text: questionText
+															};
+															
+															controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(question)}\n\n`));
 														}
 													}
 												}
@@ -546,43 +563,58 @@ Your final output should be just the explanation, without any additional comment
 							).join('\n');
 
 							// Prepare reinterpretation prompt
-							const prompt = `You are a brilliant intellectual historian providing a REINTERPRETATION of the concept "${query}".
+							const prompt = `You are a brilliant intellectual historian providing an ALTERNATIVE GENEALOGY of the concept "${query}".
 
-I will show you the ORIGINAL GENEALOGY that was previously constructed, and you need to offer a fresh perspective on the same concept by exploring different aspects, traditions, or intellectual lineages.
-
-ORIGINAL GENEALOGY:
+Here is the ORIGINAL GENEALOGY that was previously constructed:
 ${existingItems}
 
-Your task: Acknowledge the original genealogy above, then provide a REINTERPRETATION that:
-1. Offers a different lens or framework for understanding "${query}"
-2. Explores alternative intellectual traditions, geographic regions, or disciplinary approaches  
-3. Highlights marginalized voices, counter-narratives, or competing interpretations
-4. Shows different historical trajectories or influences
-5. Considers non-Western, feminist, critical, or alternative theoretical frameworks
-6. May include popular culture, social movements, or non-academic contributions
+Your task: Create a completely different 5-item genealogy that explores alternative aspects, traditions, or intellectual lineages of the same concept. Focus on different approaches, geographic regions, disciplinary perspectives, or historical trajectories.
 
-Begin your response with a brief acknowledgment of the original genealogy (1-2 sentences), then provide your alternative 5-item genealogy.
-
-Each genealogy item should follow this format:
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+Guidelines:
+- Each explanation should be under 80 words - be concise and impactful
+- Focus on works that offer genuinely different perspectives from the original genealogy
+- Arrange chronologically, showing alternative intellectual evolution
 
 Wikipedia references available: ${titles.join(", ")}
 
-After the genealogy, provide "Open Questions": 1-2 fundamental questions about "${query}" that this alternative perspective raises.
+Format your response using XML tags for easy parsing:
 
-Format your response exactly as:
 <genealogy>
-The original genealogy traced ${query} through [brief summary]. Here's an alternative perspective:
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
 
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
-[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
-
-Open Questions:
-- [Question 1]
-- [Question 2]
+<questions>
+<question>Fundamental question 1 about ${query}</question>
+<question>Fundamental question 2 about ${query}</question>
+</questions>
 </genealogy>`;
 
 							// Inform client that we are about to call the language model
@@ -626,7 +658,6 @@ Open Questions:
 							const decoder = new TextDecoder();
 							let buffer = '';
 							let accumulator = '';
-							let readingQuestions = false;
 							const processedItems = new Set();
 							const processedQuestions = new Set();
 
@@ -647,60 +678,76 @@ Open Questions:
 												if (data.type === 'content_block_delta' && data.delta?.text) {
 													accumulator += data.delta.text;
 													
-													// Check for questions section first
-													if (accumulator.toLowerCase().includes('open questions:') && !readingQuestions) {
-														readingQuestions = true;
-														controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
-													}
+													console.log('🔍 Reinterpret: Looking for items in:', accumulator.slice(-500));
 													
-													// Parse genealogy items (only if not in questions section)
-													if (!readingQuestions) {
-														const itemPattern = /([^(\n]+)\s*\(([^)]+)\)\s*\[\[([^\]]+)\]\]\s*—\s*([^.\n]+(?:\.[^.\n]*)?)\./g;
-														let match;
-														while ((match = itemPattern.exec(accumulator)) !== null) {
-															const [fullMatch, title, year, url, claim] = match;
-															const itemKey = `${title.trim()}_${year.trim()}`;
+													// Parse XML-formatted genealogy items
+													const itemMatches = [...accumulator.matchAll(/<item>([\s\S]*?)<\/item>/g)];
+													for (const itemMatch of itemMatches) {
+														const itemXml = itemMatch[1];
+														const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
+														const yearMatch = itemXml.match(/<year>(.*?)<\/year>/);
+														const urlMatch = itemXml.match(/<url>(.*?)<\/url>/);
+														const explanationMatch = itemXml.match(/<explanation>([\s\S]*?)<\/explanation>/);
+														
+														if (titleMatch && yearMatch && urlMatch && explanationMatch) {
+															const title = titleMatch[1].trim();
+															const year = yearMatch[1].trim();
+															const url = urlMatch[1].trim();
+															const explanation = explanationMatch[1].trim();
+															const itemKey = `${title}_${year}`;
+															
+															console.log('🎯 Reinterpret: Found XML item:', { title, year, url, explanation: explanation.slice(0, 100) + '...' });
 															
 															if (!processedItems.has(itemKey) && 
-																title.trim().length > 5 && 
-																claim.trim().length > 10) {
+																title.length > 3 && 
+																explanation.length > 5) {
 																processedItems.add(itemKey);
 																
 																const item = {
 																	type: "genealogy_item",
-																	title: title.trim(),
-																	year: year.trim(),
-																	url: url.trim(),
-																	claim: claim.trim()
+																	title: title,
+																	year: year,
+																	url: url,
+																	claim: explanation
 																};
 																
+																console.log('✅ Reinterpret: Sending item:', item);
 																controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(item)}\n\n`));
+															} else {
+																console.log('❌ Reinterpret: Rejected item:', { 
+																	itemKey, 
+																	alreadyProcessed: processedItems.has(itemKey), 
+																	titleLength: title.length, 
+																	explanationLength: explanation.length 
+																});
 															}
 														}
 													}
 													
-													// Parse questions (only if in questions section)
-													if (readingQuestions) {
-														const lines = accumulator.split('\n');
-														for (const line of lines) {
-															const trimmedLine = line.trim();
+													// Parse XML-formatted questions
+													const questionMatches = [...accumulator.matchAll(/<question>(.*?)<\/question>/g)];
+													for (const questionMatch of questionMatches) {
+														const questionText = questionMatch[1].trim();
+														
+														console.log('🔍 Reinterpret: Found question:', questionText);
+														
+														if (questionText.length > 30 && 
+															questionText.length < 400 && 
+															!processedQuestions.has(questionText.toLowerCase())) {
+															processedQuestions.add(questionText.toLowerCase());
 															
-														if (trimmedLine.startsWith('- ') && trimmedLine.includes('?')) {
-																const questionText = trimmedLine.substring(2).trim();
-																
-																if (questionText.length > 30 && 
-																	questionText.length < 400 && 
-																	!processedQuestions.has(questionText.toLowerCase())) {
-																	processedQuestions.add(questionText.toLowerCase());
-																	
-																	const question = {
-																		type: "question",
-																		text: questionText
-																	};
-																	
-																	controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(question)}\n\n`));
-																}
+															// Send questions section signal first time we find questions
+															if (processedQuestions.size === 1) {
+																controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
 															}
+															
+															const question = {
+																type: "question",
+																text: questionText
+															};
+															
+															console.log('✅ Reinterpret: Sending question:', question);
+															controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(question)}\n\n`));
 														}
 													}
 												}
