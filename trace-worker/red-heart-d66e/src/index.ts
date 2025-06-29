@@ -71,7 +71,7 @@ Guidelines:
 2. Arrange chronologically, showing intellectual evolution and ruptures
 3. Each claim should reveal what made that work revolutionary for its time
 4. URLs should link to primary sources, key texts, or authoritative encyclopedic entries
-5. Wikipedia references available: ${titles.join(", ")}
+Wikipedia references available: ${titles.join(", ")}
 
 After the genealogy, provide "Open Questions": 1-2 fundamental questions that remain unresolved and actively debated today about "${query}".
 
@@ -292,7 +292,7 @@ Guidelines:
 2. Arrange chronologically, showing intellectual evolution and ruptures
 3. Each claim should reveal what made that work revolutionary for its time
 4. URLs should link to primary sources, key texts, or authoritative encyclopedic entries
-5. Wikipedia references available: ${titles.join(", ")}
+Wikipedia references available: ${titles.join(", ")}
 
 After the genealogy, provide "Open Questions": 1-2 fundamental questions that remain unresolved and actively debated today about "${query}".
 
@@ -414,15 +414,32 @@ Open Questions:
 					});
 				}
 
-				const prompt = `Explain "${title}" (${year}) in simple, clear terms. Focus on: ${claim}
+				const prompt = `You are tasked with explaining a significant work in intellectual history. Your goal is to make this explanation clear, concise, and accessible to a general audience. Here are the details of the work you need to explain:
 
-Write exactly 3-4 sentences (under 100 words total) that explain:
-1. Why this work was important when it came out
-2. What new idea or approach it introduced
-3. How it influenced later thinking
-4. Why it still matters today
+<title>${title}</title>
+<year>${year}</year>
+<claim>${claim}</claim>
 
-Use clear, straightforward language that anyone can understand. Be direct and to the point.`;
+Your task is to explain this work in simple, clear terms. Focus on the claim provided above. Write an explanation that adheres to the following guidelines:
+
+1. Length: Your explanation should be exactly 3-4 sentences, with a total word count under 100.
+2. Content: Address the following points in your explanation:
+   a. Why this work was important when it was published
+   b. What new idea or approach it introduced
+   c. How it influenced later thinking
+   d. Why it still matters today
+
+3. Writing style:
+   - Use clear, straightforward language that anyone can understand
+   - Be direct and to the point
+   - Avoid jargon or overly technical terms
+   - If you must use a complex term, briefly explain it
+
+4. Structure your explanation to flow logically from the work's initial importance to its lasting impact.
+
+Remember, your primary goal is to make this complex idea accessible to a general audience. Prioritize clarity and simplicity in your explanation.
+
+Your final output should be just the explanation, without any additional commentary or meta-discussion. Present your explanation within <explanation> tags.`;
 
 				// Call Anthropic API
 				const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
