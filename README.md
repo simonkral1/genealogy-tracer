@@ -1,101 +1,125 @@
-# Concept Tracer - A Browser Extension for Intellectual Genealogy
+# Concept Tracer - AI-Powered Intellectual Genealogy
 
 <p align="center">
   <img src="icons/logo_final.png" alt="Concept Tracer Logo" width="200"/>
 </p>
 
-## 🌐 Trace Online
+## 🌐 Try It Online
 
-**[Visit the Concept Tracer Website](https://genealogy-ai.github.io/)**
+**[Visit the Concept Tracer Website](https://simonkral1.github.io/genealogy-tracer/)**
 
-- **Try the Web Version**: Experience Concept Tracer directly in your browser
-- **Learn More**: Explore features and read about the genealogical method
-- **Download Extension**: Get the Chrome extension for seamless integration
+- **Web Interface**: Experience Concept Tracer directly in your browser
+- **Chrome Extension**: Download for seamless webpage integration
+- **Learn More**: Explore the genealogical method and see examples
 
-The website features the same scholarly aesthetic as the extension, inspired by the Library of Babel, with a clean interface for tracing concepts without needing to install anything.
+Experience the power of intellectual genealogy through a clean, scholarly interface inspired by academic research.
 
-## Truth is a Slippery Idea
+## By this art you may contemplate the genealogy of ideas
 
-Many thinkers have problematized truth, and dogmatic claims to "truth" have often served as roadblocks for thought. Nietzsche developed a powerful response: the genealogical method. This is not a search for static facts, but a historical uncovering of the origins, contingencies, and power struggles behind the concepts we use unconsciously.
+Concept Tracer is an AI-powered tool that reveals the intellectual genealogy of ideas. Select any text on the web or enter a concept directly, and discover its historical lineage, key contributors, and evolutionary path through time.
 
-**Concept Tracer** is the operationalization of Nietzsche's genealogical method for the digital age - a browser extension that uses AI as a partner in truth-seeking, not an oracle of it.
+Each trace reveals new connections, citations, and questions that illuminate the contingency of our concepts and the power relations that shaped them.
 
-## 📥 Download & Install
+## 📥 Download Extension
 
-**[⬇️ Download Concept Tracer Extension](./concept-tracer-extension.zip)**
+**[⬇️ Download Concept Tracer v0.1](./concept-tracer-extension-v0.1.zip)**
 
 ### Quick Install:
 1. Download the extension file above
 2. Go to `chrome://extensions/` in Chrome
 3. Enable "Developer mode" (top right toggle)
-4. Click "Load unpacked" and select the downloaded folder
-5. Start tracing concepts on any webpage!
+4. Drag and drop the downloaded file onto the page
+5. Select text on any webpage and press `Ctrl+Shift+G` (or `Cmd+Shift+G` on Mac)
 
-## What It Does
+## ✨ Key Features
 
-Select any word or phrase on a webpage and instantly examine its intellectual history. Instead of flat definitions, Concept Tracer reveals a concept's genealogy: the story of its emergence, mutations, and the intellectual battles that have shaped it.
+### 🔍 **Intelligent Genealogy Tracing**
+- **Instant Analysis**: Trace any concept's intellectual history in seconds
+- **Scholarly Sources**: Each entry includes primary sources and authoritative references
+- **Chronological Evolution**: See how ideas transformed across time and contexts
+- **80-Word Explanations**: Concise, impactful insights that capture key paradigm shifts
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/genealogy-demo.gif" alt="Concept Tracer Demo" width="600"/>
-</p>
+### 🔄 **Reinterpret Functionality** ⭐ *New Feature*
+- **Alternative Perspectives**: Generate completely different genealogies from various intellectual traditions
+- **Multiple Angles**: Explore geographic, disciplinary, or cultural alternatives to mainstream narratives
+- **Comparative Analysis**: See how different schools of thought approach the same concept
 
-### Features
+### 🎯 **Advanced Interaction**
+- **Recursive Exploration**: Every result can be traced further, creating chains of investigation
+- **Expand Analysis**: Get detailed analysis of any genealogical entry with one click
+- **Copy & Export**: Save formatted results for research and note-taking
+- **Smart Caching**: Previously traced concepts load instantly from local storage
 
-- **Instant Genealogies**: Trace any concept's intellectual history in seconds
-- **Non-Intrusive Interface**: Minimalist popup that sits alongside your reading, like a genealogical interactive Wikipedia
-- **Recursive Exploration**: Every result can be traced further, creating chains of intellectual investigation
-- **Expand Function**: Get detailed analysis of any genealogical entry with a single click
-- **Smart Caching**: Previously traced concepts load instantly from your personal archive
-- **Open Questions**: Each trace reveals unresolved debates and gaps in knowledge
-- **Export Research**: Copy formatted results for your notes and further study
+### 🌐 **Seamless Integration**
+- **Non-Intrusive Interface**: Minimalist popup that enhances your reading experience
+- **Multiple Access Methods**: Right-click menu, keyboard shortcut, or toolbar icon
+- **Real-Time Streaming**: Results appear as the AI processes your query
+- **Cross-Platform**: Works on any website, from Wikipedia to academic journals
 
 ## 🚀 How to Use
 
-1. **Install the Extension**
-   - Download `concept-tracer-extension.zip` from the [download link above](#-download--install)
-   - Go to `chrome://extensions/` in Chrome
-   - Enable "Developer mode" (top right toggle)
-   - Click "Load unpacked" and select the unzipped folder
+### Browser Extension
+1. **Install**: Download and install the Chrome extension
+2. **Select Text**: Highlight any word or phrase on a webpage
+3. **Activate**: Press `Ctrl+Shift+G` (or `Cmd+Shift+G` on Mac) or right-click → "Trace Genealogy"
+4. **Explore**: View genealogy, click "trace" to go deeper, or "reinterpret" for alternative perspectives
+5. **Research**: Use "expand" for detailed analysis and "copy" to save your findings
 
-2. **Trace Any Concept**
-   - **Method 1:** Select text on any webpage → Right-click → "Trace Genealogy"
-   - **Method 2:** Select text → Press `Ctrl+Shift+G` (or `Cmd+Shift+G` on Mac)
-   - **Method 3:** Select text → Click the extension icon in your toolbar
-
-3. **Explore Results**
-   - View the intellectual genealogy with sources and years
-   - Click "trace" on any result to dive deeper
-   - Click "expand" for detailed analysis of specific entries
-   - Use "Copy All" to save your research
-   - Explore open questions for further investigation
+### Web Interface
+1. **Visit**: Go to [simonkral1.github.io/genealogy-tracer](https://simonkral1.github.io/genealogy-tracer/)
+2. **Enter Concept**: Type any concept or idea you want to trace
+3. **Analyze**: View the genealogy with sources, years, and explanations
+4. **Reinterpret**: Generate alternative genealogies from different intellectual perspectives
 
 ## 🎯 Perfect For
 
-- **Students** researching essay topics with historical depth
-- **Academics** exploring intellectual history
-- **Writers** understanding the genealogical weight of their words
-- **Anyone** who believes the important question is not "What is the truth?" but "How did this come to be seen as true?"
+- **Students** researching papers with historical depth and alternative perspectives
+- **Academics** exploring intellectual history and comparative approaches
+- **Writers** understanding the genealogical weight and contested nature of concepts
+- **Researchers** investigating how ideas emerged and evolved across traditions
+- **Anyone** curious about the contingent history behind taken-for-granted concepts
 
-## 🔧 Technical Details
+## 🔧 Technical Architecture
 
-The extension uses AI to generate structured genealogies of concepts, presenting them through a minimalist interface inspired by library card catalogs. Results stream in real-time as the AI traces through intellectual history.
+### AI-Powered Analysis
+- **Streaming Responses**: Real-time genealogy generation with status updates
+- **XML-Based Parsing**: Reliable extraction of structured genealogical data
+- **Multiple LLM Endpoints**: `/stream` for genealogies, `/reinterpret` for alternatives, `/expand` for detailed analysis
+- **Wikipedia Integration**: Leverages scholarly databases for authoritative sources
 
-**Privacy**: Your selections are processed securely. Results are cached locally in your browser for 24 hours. No permanent storage of your queries.
+### Privacy & Performance
+- **Local Caching**: Results stored in browser for 24 hours, no permanent tracking  
+- **Secure Processing**: Queries processed securely with no permanent storage
+- **Optimized Performance**: Fast streaming responses with intelligent caching
+- **Cross-Origin Support**: Works seamlessly across all websites
 
-## 📦 Installation from Source
+## 🌟 Recent Updates
+
+### v0.1 - Major Feature Release
+- ✅ **Reinterpret Functionality**: Generate alternative genealogies from different perspectives
+- ✅ **XML Parsing**: More reliable extraction of genealogical data
+- ✅ **80-Word Limit**: Concise, impactful explanations for each genealogy item
+- ✅ **Improved Caching**: Better validation and faster loading of cached results
+- ✅ **Enhanced Error Handling**: More robust API communication and fallbacks
+- ✅ **Streaming Optimizations**: Faster, more reliable real-time responses
+
+## 📦 Development Setup
 
 ```bash
 # Clone this repository
 git clone https://github.com/your-username/genealogy-ai.git
 cd genealogy-ai
 
-# The extension files are in the root directory
-# Follow the installation steps above using this directory
+# For local development, serve the web interface
+python3 -m http.server 8000
+
+# Extension files are ready to load in Chrome developer mode
+# Just drag concept-tracer-extension-v0.1.zip onto chrome://extensions/
 ```
 
 ## 🤝 Contributing
 
-We welcome contributions! The project aims to make genealogical thinking accessible in the digital age.
+We welcome contributions to advance genealogical thinking in the digital age! Whether it's new features, bug fixes, or theoretical improvements to the genealogical method.
 
 ## 📄 License
 
@@ -103,4 +127,6 @@ MIT License - See LICENSE file for details
 
 ---
 
-*"The most important question is not 'What is the truth?' but 'How did this come to be seen as true?'"* 
+*"There are no facts, only interpretations." — Nietzsche*
+
+**Concept Tracer operationalizes Nietzsche's genealogical method for the digital age, using AI as a partner in truth-seeking, not an oracle of it.**
