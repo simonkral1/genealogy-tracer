@@ -22,8 +22,8 @@ export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		const url = new URL(request.url);
 
-		// CORS pre-flight for /trace, /stream, and /expand
-		if ((url.pathname === '/trace' || url.pathname === '/stream' || url.pathname === '/expand') && request.method === 'OPTIONS') {
+		// CORS pre-flight for /trace, /stream, /expand, and /reinterpret
+		if ((url.pathname === '/trace' || url.pathname === '/stream' || url.pathname === '/expand' || url.pathname === '/reinterpret') && request.method === 'OPTIONS') {
 			return new Response(null, {
 				headers: {
 					'Access-Control-Allow-Origin': '*',
@@ -508,12 +508,248 @@ Your final output should be just the explanation, without any additional comment
 			}
 		}
 
+		// New /reinterpret endpoint for alternative genealogy
+		if (url.pathname === '/reinterpret' && request.method === 'POST') {
+			try {
+				const requestData = await request.json() as { 
+					query: string; 
+					existingGenealogy: Array<{title: string; year: string; claim: string; url?: string}> 
+				};
+				const { query, existingGenealogy } = requestData;
+				
+				if (!query || !existingGenealogy || !Array.isArray(existingGenealogy)) {
+					return new Response(JSON.stringify({ error: 'Missing required fields: query and existingGenealogy array' }), {
+						status: 400,
+						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+					});
+				}
+
+				// Create a streaming response
+				const stream = new ReadableStream({
+					async start(controller) {
+						try {
+							// Send initial status
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Searching for alternative perspectives"}\n\n`));
+
+							// Wikipedia search for fresh sources
+							const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+								encodeURIComponent(query) + '&format=json&origin=*&srlimit=5';
+							const wikiRes = await fetch(wikiURL);
+							const wikiJson = (await wikiRes.json()) as any;
+							const titles = wikiJson.query.search.slice(0, 5).map((i: any) => i.title);
+
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Consulting alternative sources"}\n\n`));
+
+							// Format existing genealogy for the prompt
+							const existingItems = existingGenealogy.map((item, index) => 
+								`${index + 1}. ${item.title} (${item.year}) — ${item.claim}`
+							).join('\n');
+
+							// Prepare reinterpretation prompt
+							const prompt = `You are a brilliant intellectual historian providing a REINTERPRETATION of the concept "${query}".
+
+I will show you the ORIGINAL GENEALOGY that was previously constructed, and you need to offer a fresh perspective on the same concept by exploring different aspects, traditions, or intellectual lineages.
+
+ORIGINAL GENEALOGY:
+${existingItems}
+
+Your task: Acknowledge the original genealogy above, then provide a REINTERPRETATION that:
+1. Offers a different lens or framework for understanding "${query}"
+2. Explores alternative intellectual traditions, geographic regions, or disciplinary approaches  
+3. Highlights marginalized voices, counter-narratives, or competing interpretations
+4. Shows different historical trajectories or influences
+5. Considers non-Western, feminist, critical, or alternative theoretical frameworks
+6. May include popular culture, social movements, or non-academic contributions
+
+Begin your response with a brief acknowledgment of the original genealogy (1-2 sentences), then provide your alternative 5-item genealogy.
+
+Each genealogy item should follow this format:
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+
+Wikipedia references available: ${titles.join(", ")}
+
+After the genealogy, provide "Open Questions": 1-2 fundamental questions about "${query}" that this alternative perspective raises.
+
+Format your response exactly as:
+<genealogy>
+The original genealogy traced ${query} through [brief summary]. Here's an alternative perspective:
+
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+[TITLE] ([YEAR]) [[URL]] — [SPECIFIC_INSIGHT_OR_PARADIGM_SHIFT]
+
+Open Questions:
+- [Question 1]
+- [Question 2]
+</genealogy>`;
+
+							// Inform client that we are about to call the language model
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Generating alternative genealogy"}\n\n`));
+
+							// Call Anthropic API with streaming
+							const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
+							const anthropicApiKey = env.ANTHROPIC_API_KEY;
+
+							if (!anthropicApiKey) {
+								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"Anthropic API key not set"}\n\n`));
+								controller.close();
+								return;
+							}
+
+							const llmRes = await fetch(anthropicApiUrl, {
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/json',
+									'x-api-key': anthropicApiKey,
+									'anthropic-version': '2023-06-01',
+								},
+								body: JSON.stringify({
+									model: 'claude-opus-4-20250514',
+									messages: [{ role: 'user', content: prompt }],
+									max_tokens: 1500,
+									stream: true
+								}),
+							});
+
+							if (!llmRes.ok) {
+								const errorBody = await llmRes.text();
+								console.error('Claude API error:', llmRes.status);
+								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"AI service error: ${llmRes.status}"}\n\n`));
+								controller.close();
+								return;
+							}
+
+							// Process Claude's streaming response (same logic as /stream endpoint)
+							const reader = llmRes.body!.getReader();
+							const decoder = new TextDecoder();
+							let buffer = '';
+							let accumulator = '';
+							let readingQuestions = false;
+							const processedItems = new Set();
+							const processedQuestions = new Set();
+
+							try {
+								while (true) {
+									const { done, value } = await reader.read();
+									if (done) break;
+
+									buffer += decoder.decode(value, { stream: true });
+									const lines = buffer.split('\n');
+									buffer = lines.pop() || '';
+
+									for (const line of lines) {
+										if (line.startsWith('data: ')) {
+											try {
+												const data = JSON.parse(line.slice(6));
+												
+												if (data.type === 'content_block_delta' && data.delta?.text) {
+													accumulator += data.delta.text;
+													
+													// Check for questions section first
+													if (accumulator.toLowerCase().includes('open questions:') && !readingQuestions) {
+														readingQuestions = true;
+														controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
+													}
+													
+													// Parse genealogy items (only if not in questions section)
+													if (!readingQuestions) {
+														const itemPattern = /([^(\n]+)\s*\(([^)]+)\)\s*\[\[([^\]]+)\]\]\s*—\s*([^.\n]+(?:\.[^.\n]*)?)\./g;
+														let match;
+														while ((match = itemPattern.exec(accumulator)) !== null) {
+															const [fullMatch, title, year, url, claim] = match;
+															const itemKey = `${title.trim()}_${year.trim()}`;
+															
+															if (!processedItems.has(itemKey) && 
+																title.trim().length > 5 && 
+																claim.trim().length > 10) {
+																processedItems.add(itemKey);
+																
+																const item = {
+																	type: "genealogy_item",
+																	title: title.trim(),
+																	year: year.trim(),
+																	url: url.trim(),
+																	claim: claim.trim()
+																};
+																
+																controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(item)}\n\n`));
+															}
+														}
+													}
+													
+													// Parse questions (only if in questions section)
+													if (readingQuestions) {
+														const lines = accumulator.split('\n');
+														for (const line of lines) {
+															const trimmedLine = line.trim();
+															
+														if (trimmedLine.startsWith('- ') && trimmedLine.includes('?')) {
+																const questionText = trimmedLine.substring(2).trim();
+																
+																if (questionText.length > 30 && 
+																	questionText.length < 400 && 
+																	!processedQuestions.has(questionText.toLowerCase())) {
+																	processedQuestions.add(questionText.toLowerCase());
+																	
+																	const question = {
+																		type: "question",
+																		text: questionText
+																	};
+																	
+																	controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(question)}\n\n`));
+																}
+															}
+														}
+													}
+												}
+											} catch (e) {
+												// Skip malformed JSON
+											}
+										}
+									}
+								}
+							} finally {
+								reader.releaseLock();
+							}
+
+							// Send completion signal
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"complete"}\n\n`));
+							controller.close();
+
+						} catch (error: any) {
+							console.error('Reinterpret streaming error:', error);
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"${error.message || 'Unknown error occurred'}"}\n\n`));
+							controller.close();
+						}
+					}
+				});
+
+				return new Response(stream, {
+					headers: {
+						'Content-Type': 'text/plain; charset=utf-8',
+						'Access-Control-Allow-Origin': '*',
+						'Cache-Control': 'no-cache',
+						'Connection': 'keep-alive',
+					},
+				});
+
+			} catch (e: any) {
+				console.error('Worker error during /reinterpret:', e);
+				return new Response(JSON.stringify({ error: 'Reinterpret processing error', details: e.message }), {
+					status: 500,
+					headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+				});
+			}
+		}
+
 		if (url.pathname === '/') {
-			return new Response('Genealogy AI Trace Worker is running. Use the /trace endpoint with POST for full response, /stream for streaming, or /expand for detailed analysis.', {
+			return new Response('Genealogy AI Trace Worker is running. Use the /trace endpoint with POST for full response, /stream for streaming, /expand for detailed analysis, or /reinterpret for alternative genealogies.', {
 				headers: { 'Content-Type': 'text/plain' },
 			});
 		}
 
-		return new Response('Not found. Use /trace with POST, /stream with POST, /expand with POST, or visit the root /.', { status: 404 });
+		return new Response('Not found. Use /trace with POST, /stream with POST, /expand with POST, /reinterpret with POST, or visit the root /.', { status: 404 });
 	},
 } satisfies ExportedHandler<Env>;

@@ -462,7 +462,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         
         if (streamedItems.length > 0 || streamedQuestions.length > 0) {
-            // Remove any existing copy-all container
+            // Remove any existing actions container
+            const existingActions = traceOutput.querySelector('.actions-container');
+            if (existingActions) {
+                existingActions.remove();
+            }
+            
+            // Also remove old copy-all container for backward compatibility
             const existingCopyAll = traceOutput.querySelector('.copy-all-container');
             if (existingCopyAll) {
                 existingCopyAll.remove();
@@ -475,9 +481,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 item.style.opacity = '1'; // Ensure opacity is set
             });
             
-            // Create new copy-all container
-            const copyAllContainer = document.createElement('div');
-            copyAllContainer.className = 'copy-all-container';
+            // Create new action buttons container
+            const actionsContainer = document.createElement('div');
+            actionsContainer.className = 'actions-container';
+            actionsContainer.style.cssText = 'display: flex; gap: 10px; justify-content: center; margin-top: 20px;';
             
             const copyAllBtn = document.createElement('button');
             copyAllBtn.textContent = 'Copy All Results';
@@ -504,8 +511,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 copyToClipboard(allText);
             });
             
-            copyAllContainer.appendChild(copyAllBtn);
-            traceOutput.appendChild(copyAllContainer);
+            const reinterpretBtn = document.createElement('button');
+            reinterpretBtn.textContent = 'Reinterpret';
+            reinterpretBtn.className = 'copy-all-button'; // Use same styling as copy button
+            reinterpretBtn.addEventListener('click', (e) => {
+                console.log('Reinterpret button clicked!');
+                e.preventDefault();
+                performReinterpret();
+            });
+            
+            actionsContainer.appendChild(copyAllBtn);
+            actionsContainer.appendChild(reinterpretBtn);
+            traceOutput.appendChild(actionsContainer);
             
             // Cache the complete response for future use
             const cacheData = {
@@ -700,16 +717,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function displayCachedResults(cachedData) {
-        console.log('displayCachedResults called with:', cachedData);
-        
         // Make sure container is visible
         showResults();
         
         if (cachedData.genealogy && cachedData.genealogy.length > 0) {
-            console.log('Found cached genealogy items:', cachedData.genealogy.length);
-            
-            cachedData.genealogy.forEach((item, index) => {
-                console.log(`Adding cached item ${index + 1}:`, item);
+            cachedData.genealogy.forEach(item => {
                 addGenealogyItem(item);
             });
             
@@ -717,7 +729,6 @@ document.addEventListener('DOMContentLoaded', function () {
             streamedItems = [...cachedData.genealogy];
             
             if (cachedData.questions && cachedData.questions.length > 0) {
-                console.log('Found cached questions:', cachedData.questions.length);
                 cachedData.questions.forEach(question => {
                     addQuestion(question);
                 });
@@ -727,14 +738,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             
             // Complete the streaming process for cached results
-            console.log('Completing streaming for cached results');
             completeStreaming();
         } else {
-            console.log('Invalid cached data, clearing cache and making fresh API call');
             // If cached data is invalid, clear it and make a fresh request
             const cacheKey = `concept_tracer_${currentQuery.toLowerCase().trim()}`;
             localStorage.removeItem(cacheKey);
-            console.log('Removed invalid cache entry for:', currentQuery);
             
             // Make a fresh API call
             performTraceApiCall();
@@ -783,6 +791,169 @@ document.addEventListener('DOMContentLoaded', function () {
     // Focus input on load
     conceptInput.focus();
     
+    // Reinterpret function to get alternative genealogy
+    async function performReinterpret() {
+        console.log('Reinterpret function called');
+        console.log('Current query:', currentQuery);
+        console.log('Streamed items:', streamedItems);
+        console.log('Is streaming:', isStreaming);
+        
+        if (!currentQuery || streamedItems.length === 0 || isStreaming) {
+            console.log('Reinterpret cancelled - missing data or already streaming');
+            return;
+        }
+
+        // Prepare data for reinterpret endpoint
+        const requestData = {
+            query: currentQuery,
+            existingGenealogy: streamedItems.map(item => ({
+                title: item.title,
+                year: item.year,
+                claim: item.claim,
+                url: item.url
+            }))
+        };
+
+        console.log('Request data prepared:', requestData);
+
+        // Clear current results 
+        traceOutput.innerHTML = '';
+        questionsList.innerHTML = '';
+        if (timeline) {
+            const timelineItems = timeline.querySelectorAll('.timeline-item');
+            timelineItems.forEach(item => item.remove());
+        }
+        questionsSection.style.display = 'none';
+        streamedItems = [];
+        streamedQuestions = [];
+
+        // Set streaming flag
+        isStreaming = true;
+
+        // Disable buttons
+        const traceButton = document.getElementById('trace-button');
+        if (traceButton) {
+            traceButton.disabled = true;
+            traceButton.textContent = 'Reinterpreting...';
+        }
+
+        showLoading('Searching for alternative perspectives');
+
+        try {
+            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/reinterpret', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+
+            if (!response.body) {
+                throw new Error('No response body');
+            }
+
+            // Handle streaming response (same logic as original trace)
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let streamCompleted = false;
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    buffer += chunk;
+                    
+                    // Process complete SSE events delineated by a blank line ("\n\n")
+                    let eventEnd;
+                    while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
+                        const rawEvent = buffer.slice(0, eventEnd).trim();
+                        buffer = buffer.slice(eventEnd + 2);
+                        if (!rawEvent.startsWith('data:')) continue;
+                        try {
+                            const jsonStr = rawEvent.slice(5).trim();
+                            if (jsonStr === '') continue;
+                            const data = JSON.parse(jsonStr);
+                            
+                            switch (data.type) {
+                                case 'status':
+                                    if (streamCompleted) break;
+                                    const reinterpretPhrases = {
+                                        'Searching for alternative perspectives': 'Exploring different intellectual traditions',
+                                        'Consulting alternative sources': 'Examining counter-narratives and marginalized voices',
+                                        'Generating alternative genealogy': 'Constructing alternative genealogy'
+                                    };
+                                    const scholarlyMessage = reinterpretPhrases[data.message] || data.message;
+                                    showLoading(scholarlyMessage);
+                                    break;
+                                    
+                                case 'genealogy_item':
+                                    if (streamCompleted) break;
+                                    streamedItems.push(data);
+                                    addGenealogyItem(data);
+                                    break;
+                                    
+                                case 'section':
+                                    if (streamCompleted) break;
+                                    if (data.section === 'questions') {
+                                        questionsSection.style.display = 'block';
+                                    }
+                                    break;
+                                    
+                                case 'question':
+                                    if (streamCompleted) break;
+                                    addQuestion(data.text);
+                                    streamedQuestions.push(data.text);
+                                    break;
+                                    
+                                case 'complete':
+                                    if (!streamCompleted) {
+                                        streamCompleted = true;
+                                        completeStreaming();
+                                    }
+                                    return;
+                                    
+                                case 'error':
+                                    if (!streamCompleted) {
+                                        streamCompleted = true;
+                                        isStreaming = false;
+                                        showError(data.message);
+                                    }
+                                    return;
+                            }
+                        } catch (parseError) {
+                            console.error('Error parsing reinterpret stream data:', parseError, 'Event:', rawEvent);
+                        }
+                    }
+                }
+            } finally {
+                reader.releaseLock();
+            }
+
+            // Only complete if stream didn't already complete
+            if (!streamCompleted && (streamedItems.length > 0 || streamedQuestions.length > 0)) {
+                completeStreaming();
+            }
+
+        } catch (error) {
+            console.error('Reinterpret error:', error);
+            isStreaming = false;
+            showError(error.message || 'An error occurred while reinterpreting the concept.');
+        } finally {
+            if (traceButton) {
+                traceButton.disabled = false;
+                traceButton.textContent = 'Trace Genealogy';
+            }
+        }
+    }
+
     // Debug function to clear all cached data (accessible from browser console)
     window.clearConceptCache = function() {
         Object.keys(localStorage).forEach(key => {
