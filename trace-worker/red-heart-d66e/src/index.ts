@@ -109,7 +109,7 @@ Open Questions:
 									'anthropic-version': '2023-06-01',
 								},
 								body: JSON.stringify({
-									model: 'claude-sonnet-4-20250514',
+									model: 'claude-opus-4-20250514',
 									messages: [{ role: 'user', content: prompt }],
 									max_tokens: 1500,
 									stream: true
@@ -332,7 +332,7 @@ Open Questions:
 						'anthropic-version': '2023-06-01',
 					},
 					body: JSON.stringify({
-						model: 'claude-sonnet-4-20250514', // Updated to user-specified model
+						model: 'claude-opus-4-20250514', // Updated to user-specified model
 						messages: [{ role: 'user', content: prompt }],
 						max_tokens: 1500, // Reduced from 2048 for faster response
 					}),
@@ -443,7 +443,7 @@ Use clear, straightforward language that anyone can understand. Be direct and to
 						'anthropic-version': '2023-06-01',
 					},
 					body: JSON.stringify({
-						model: 'claude-sonnet-4-20250514',
+						model: 'claude-opus-4-20250514',
 						messages: [{ role: 'user', content: prompt }],
 						max_tokens: 800,
 					}),
