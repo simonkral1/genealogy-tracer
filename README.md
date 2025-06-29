@@ -22,7 +22,7 @@ Each trace reveals new connections, citations, and questions that illuminate the
 
 ## 📥 Download Extension
 
-**[⬇️ Download Concept Tracer v0.1](./concept-tracer-extension-v0.1.zip)**
+**[⬇️ Download Concept Tracer Early Alpha v0.1](./concept-tracer-extension-v0.1.zip)**
 
 ### Quick Install:
 1. Download the extension file above
@@ -95,7 +95,7 @@ Each trace reveals new connections, citations, and questions that illuminate the
 
 ## 🌟 Recent Updates
 
-### v0.1 - Major Feature Release
+### Early Alpha v0.1 - Major Feature Release
 - ✅ **Reinterpret Functionality**: Generate alternative genealogies from different perspectives
 - ✅ **XML Parsing**: More reliable extraction of genealogical data
 - ✅ **80-Word Limit**: Concise, impactful explanations for each genealogy item
