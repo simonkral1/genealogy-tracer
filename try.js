@@ -700,11 +700,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function displayCachedResults(cachedData) {
+        console.log('displayCachedResults called with:', cachedData);
+        
         // Make sure container is visible
         showResults();
         
         if (cachedData.genealogy && cachedData.genealogy.length > 0) {
-            cachedData.genealogy.forEach(item => {
+            console.log('Found cached genealogy items:', cachedData.genealogy.length);
+            
+            cachedData.genealogy.forEach((item, index) => {
+                console.log(`Adding cached item ${index + 1}:`, item);
                 addGenealogyItem(item);
             });
             
@@ -712,6 +717,7 @@ document.addEventListener('DOMContentLoaded', function () {
             streamedItems = [...cachedData.genealogy];
             
             if (cachedData.questions && cachedData.questions.length > 0) {
+                console.log('Found cached questions:', cachedData.questions.length);
                 cachedData.questions.forEach(question => {
                     addQuestion(question);
                 });
@@ -721,8 +727,10 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             
             // Complete the streaming process for cached results
+            console.log('Completing streaming for cached results');
             completeStreaming();
         } else {
+            console.log('Invalid cached data, clearing cache and making fresh API call');
             // If cached data is invalid, clear it and make a fresh request
             const cacheKey = `concept_tracer_${currentQuery.toLowerCase().trim()}`;
             localStorage.removeItem(cacheKey);
@@ -774,4 +782,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Focus input on load
     conceptInput.focus();
+    
+    // Debug function to clear all cached data (accessible from browser console)
+    window.clearConceptCache = function() {
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('concept_tracer_')) {
+                localStorage.removeItem(key);
+                console.log('Removed cache entry:', key);
+            }
+        });
+        console.log('All concept tracer cache cleared');
+    };
 }); 
