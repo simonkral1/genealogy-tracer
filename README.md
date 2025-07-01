@@ -163,21 +163,7 @@ This ensures the reinterpretation is not random but systematically explores inte
 - **CORS Configuration**: Properly configured for extension and web access
 - **Input Sanitization**: Protection against prompt injection attacks
 
-## 💰 Cost Analysis & Sustainability
 
-### Current Infrastructure Costs
-- **Claude Opus 4 API**: ~$0.015 per trace (average)
-- **Cloudflare Workers**: Free tier covers current usage
-- **Wikipedia API**: Free and unlimited
-- **Caching**: Reduces API costs by ~40% through local storage
-
-### Optimization Strategies
-- **Smart Caching**: 24-hour browser cache prevents duplicate API calls
-- **Streaming Responses**: Reduces perceived latency without increasing costs
-- **Structured Prompts**: Minimizes token usage while maintaining quality
-- **Error Boundaries**: Prevents costly retry loops
-
-#
 ## 🧭 Philosophical Approach
 
 ### Avoiding the "Oracle Problem"
