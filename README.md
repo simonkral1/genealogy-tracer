@@ -16,9 +16,11 @@ Experience the power of intellectual genealogy through a clean, scholarly interf
 
 ## By this art you may contemplate the genealogy of ideas
 
-Concept Tracer is an AI-powered tool that reveals the intellectual genealogy of ideas. Select any text on the web or enter a concept directly, and discover its historical lineage, key contributors, and evolutionary path through time.
+Concept Tracer is an AI-powered tool that reveals the intellectual genealogy of ideas through a sophisticated RAG (Retrieval-Augmented Generation) architecture. Built on Cloudflare Workers and powered by Claude Opus 4, it combines Wikipedia's knowledge base with structured XML prompting to generate historically-grounded conceptual genealogies.
 
-Each trace reveals new connections, citations, and questions that illuminate the contingency of our concepts and the power relations that shaped them.
+Unlike simple AI summaries, Concept Tracer employs a multi-stage pipeline: Wikipedia API search → context enrichment → structured LLM prompting → XML parsing → streaming delivery. Each genealogy traces 5 pivotal works with 80-word explanations of their paradigm shifts, complete with verifiable sources.
+
+The innovative "Reinterpret" feature generates alternative genealogies by instructing the model to explore different intellectual traditions, geographic regions, or disciplinary perspectives—actively undermining any single narrative and embodying Nietzschean genealogical method in code.
 
 ## 📥 Download Extension
 
@@ -39,7 +41,7 @@ Each trace reveals new connections, citations, and questions that illuminate the
 - **Chronological Evolution**: See how ideas transformed across time and contexts
 - **80-Word Explanations**: Concise, impactful insights that capture key paradigm shifts
 
-### 🔄 **Reinterpret Functionality** ⭐ *New Feature*
+### 🔄 **Reinterpret Functionality** 
 - **Alternative Perspectives**: Generate completely different genealogies from various intellectual traditions
 - **Multiple Angles**: Explore geographic, disciplinary, or cultural alternatives to mainstream narratives
 - **Comparative Analysis**: See how different schools of thought approach the same concept
@@ -93,15 +95,105 @@ Each trace reveals new connections, citations, and questions that illuminate the
 - **Optimized Performance**: Fast streaming responses with intelligent caching
 - **Cross-Origin Support**: Works seamlessly across all websites
 
-## 🌟 Recent Updates
+### Core Infrastructure
+- **Cloudflare Workers**: Serverless edge computing for low-latency, globally distributed API endpoints
+- **Claude Opus 4 (opus-4-20250514)**: Advanced language model for nuanced intellectual history analysis
+- **Streaming SSE (Server-Sent Events)**: Real-time data transmission for responsive user experience
+- **TypeScript + Vitest**: Type-safe development with comprehensive test coverage
 
-### Early Alpha v0.1 - Major Feature Release
-- ✅ **Reinterpret Functionality**: Generate alternative genealogies from different perspectives
-- ✅ **XML Parsing**: More reliable extraction of genealogical data
-- ✅ **80-Word Limit**: Concise, impactful explanations for each genealogy item
-- ✅ **Improved Caching**: Better validation and faster loading of cached results
-- ✅ **Enhanced Error Handling**: More robust API communication and fallbacks
-- ✅ **Streaming Optimizations**: Faster, more reliable real-time responses
+### AI & Knowledge Engineering
+- **Structured XML Prompting**: Enforces consistent output format through XML schema validation
+  ```xml
+  <genealogy>
+    <item>
+      <title>Work Title</title>
+      <year>YYYY</year>
+      <url>https://source.url</url>
+      <explanation>Paradigm shift explanation (80 words max)</explanation>
+    </item>
+  </genealogy>
+  ```
+- **RAG-like Architecture**: Retrieval-Augmented Generation using Wikipedia API for grounding
+  - Wikipedia search API integration for source material
+  - Context injection into prompts for factual accuracy
+  - Reduces hallucination through empirical grounding
+- **Multi-Stage Processing Pipeline**:
+  1. Query → Wikipedia API search (3-5 results)
+  2. Context enrichment → Structured prompt generation
+  3. LLM processing → XML response parsing
+  4. Stream transformation → Client delivery
+
+### Advanced Features Implementation
+
+#### Reinterpret Mechanism
+- **Algorithmic Approach**: Not just prompt variations, but systematic exploration of alternative intellectual traditions
+- **Context Preservation**: Maintains original genealogy while generating contrasting perspectives
+- **Differential Analysis**: Explicitly instructs model to avoid overlap with initial interpretation
+- **Structured Alternatives**: Explores different geographic regions, disciplinary lenses, and philosophical schools
+
+**Implementation Example:**
+```typescript
+// Reinterpret endpoint receives original genealogy
+const prompt = `You are a brilliant intellectual historian providing an ALTERNATIVE GENEALOGY of the concept "${query}".
+
+Here is the ORIGINAL GENEALOGY that was previously constructed:
+${existingItems}
+
+Your task: Create a completely different 5-item genealogy that explores alternative aspects, 
+traditions, or intellectual lineages of the same concept. Focus on different approaches, 
+geographic regions, disciplinary perspectives, or historical trajectories.
+
+Guidelines:
+- Each explanation should be under 80 words
+- Focus on works that offer genuinely different perspectives from the original genealogy
+- Arrange chronologically, showing alternative intellectual evolution`;
+```
+
+This ensures the reinterpretation is not random but systematically explores intellectual diversity.
+
+#### Streaming Architecture
+- **Chunked Response Processing**: Parses incomplete XML streams in real-time
+- **Progressive Enhancement**: Items appear as they're generated, not after full completion
+- **Error Resilience**: Continues processing even with malformed chunks
+- **Deduplication Logic**: Prevents duplicate items through content hashing
+
+### Security & Privacy
+- **No User Tracking**: Zero persistent user data storage
+- **API Key Security**: Cloudflare secrets management for API credentials
+- **CORS Configuration**: Properly configured for extension and web access
+- **Input Sanitization**: Protection against prompt injection attacks
+
+## 💰 Cost Analysis & Sustainability
+
+### Current Infrastructure Costs
+- **Claude Opus 4 API**: ~$0.015 per trace (average)
+- **Cloudflare Workers**: Free tier covers current usage
+- **Wikipedia API**: Free and unlimited
+- **Caching**: Reduces API costs by ~40% through local storage
+
+### Optimization Strategies
+- **Smart Caching**: 24-hour browser cache prevents duplicate API calls
+- **Streaming Responses**: Reduces perceived latency without increasing costs
+- **Structured Prompts**: Minimizes token usage while maintaining quality
+- **Error Boundaries**: Prevents costly retry loops
+
+#
+## 🧭 Philosophical Approach
+
+### Avoiding the "Oracle Problem"
+Concept Tracer is designed as a **tool for inquiry, not truth**:
+
+1. **Explicit Contingency**: Every result emphasizes the constructed nature of genealogies
+2. **Multiple Perspectives**: The reinterpret function actively undermines singular narratives
+3. **User Agency**: Encourages recursive exploration rather than passive consumption
+4. **Source Transparency**: Always provides verifiable references, never claims of absolute truth
+
+### Interface Design Philosophy
+- **Epistemic Humility**: UI includes subtle reminders like "One possible genealogy" 
+- **Invitation to Critique**: "Reinterpret" button prominently displayed
+- **Scholarly Aesthetic**: Minimalist design emphasizes serious intellectual work
+- **Progressive Disclosure**: Complexity revealed through interaction, not overwhelming initially
+
 
 ## 📦 Development Setup
 
