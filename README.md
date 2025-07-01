@@ -14,7 +14,7 @@
 
 Experience the power of intellectual genealogy through a clean, scholarly interface inspired by academic research.
 
-## By this art you may contemplate the genealogy of ideas
+Explore the genealogy of ideas
 
 Concept Tracer is an AI-powered tool that reveals the intellectual genealogy of ideas through a sophisticated RAG (Retrieval-Augmented Generation) architecture. Built on Cloudflare Workers and powered by Claude Opus 4, it combines Wikipedia's knowledge base with structured XML prompting to generate historically-grounded conceptual genealogies.
 
