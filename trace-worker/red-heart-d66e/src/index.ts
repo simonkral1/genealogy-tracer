@@ -775,10 +775,10 @@ Format your response using XML tags for easy parsing:
 
 				return new Response(stream, {
 					headers: {
-						'Content-Type': 'text/plain; charset=utf-8',
-						'Access-Control-Allow-Origin': '*',
+						'Content-Type': 'text/event-stream',
 						'Cache-Control': 'no-cache',
 						'Connection': 'keep-alive',
+						'Access-Control-Allow-Origin': '*',
 					},
 				});
 
