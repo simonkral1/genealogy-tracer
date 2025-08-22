@@ -248,7 +248,8 @@ Format your response using XML tags for easy parsing:
 
 						} catch (error: any) {
 							console.error('Streaming error:', error);
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"${error.message}"}\n\n`));
+							const errorEvent = { type: 'error', message: String(error?.message ?? 'Unknown error') };
+							controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
 							controller.close();
 						}
 					}
@@ -767,7 +768,8 @@ Format your response using XML tags for easy parsing:
 
 						} catch (error: any) {
 							console.error('Reinterpret streaming error:', error);
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"${error.message || 'Unknown error occurred'}"}\n\n`));
+							const errorEvent = { type: 'error', message: String(error?.message ?? 'Unknown error occurred') };
+							controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
 							controller.close();
 						}
 					}
