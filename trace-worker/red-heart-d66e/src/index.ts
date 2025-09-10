@@ -54,9 +54,23 @@ export default {
 							// Wikipedia search
 							const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
 								encodeURIComponent(query) + '&format=json&origin=*&srlimit=3';
-							const wikiRes = await fetch(wikiURL);
-							const wikiJson = (await wikiRes.json()) as any;
-							const titles = wikiJson.query.search.slice(0, 3).map((i: any) => i.title);
+							let titles: string[] = [];
+							try {
+								const wikiRes = await fetch(wikiURL, {
+									headers: {
+										'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)'
+									}
+								});
+								const wikiText = await wikiRes.text();
+								let wikiJson: any = { query: { search: [] } };
+								try {
+									wikiJson = JSON.parse(wikiText);
+								} catch {}
+								titles = (wikiJson?.query?.search ?? []).slice(0, 3).map((i: any) => i.title);
+							} catch (e) {
+								// Fall back silently
+								titles = [];
+							}
 
 							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Processing genealogy"}\n\n`));
 
@@ -550,11 +564,24 @@ Your final output should be just the explanation, without any additional comment
 							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Searching for alternative perspectives"}\n\n`));
 
 							// Wikipedia search for fresh sources
-							const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
-								encodeURIComponent(query) + '&format=json&origin=*&srlimit=5';
-							const wikiRes = await fetch(wikiURL);
-							const wikiJson = (await wikiRes.json()) as any;
-							const titles = wikiJson.query.search.slice(0, 5).map((i: any) => i.title);
+							let titles: string[] = [];
+							try {
+								const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+									encodeURIComponent(query) + '&format=json&origin=*&srlimit=5';
+								const wikiRes = await fetch(wikiURL, {
+									headers: {
+										'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)'
+									}
+								});
+								const wikiText = await wikiRes.text();
+								let wikiJson: any = { query: { search: [] } };
+								try {
+									wikiJson = JSON.parse(wikiText);
+								} catch {}
+								titles = (wikiJson?.query?.search ?? []).slice(0, 5).map((i: any) => i.title);
+							} catch (e) {
+								titles = [];
+							}
 
 							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Consulting alternative sources"}\n\n`));
 
