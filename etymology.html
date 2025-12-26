@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etymology Explorer - Concept Tracer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon16.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="icons/icon48.png">
+    <link rel="icon" type="image/png" sizes="128x128" href="icons/icon128.png">
+    <style>
+        .etymo-inputs { text-align: center; margin-bottom: var(--spacing-xl); }
+        .etymo-inputs .input-container { max-width: 600px; margin-left: auto; margin-right: auto; }
+        .badge { display: inline-block; border: 1px solid var(--color-border); padding: 2px 6px; font-size: 10px; margin-right: 6px; }
+        .category-root { background: #f6faff; }
+        .category-borrow { background: #f9f6ff; }
+        .category-shift { background: #f6fff9; }
+        .category-cognate { background: #fffaf6; }
+        .category-quote { background: #fefef6; }
+        .etymo-actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-section">
+                <a href="index.html" class="logo-link">
+                    <img src="icons/icon128.png" alt="Concept Tracer" class="main-logo">
+                    <h1>Concept Tracer</h1>
+                </a>
+            </div>
+            <nav>
+                <a href="about.html">About</a>
+                <a href="try.html">Trace Online</a>
+                <a href="etymology.html" class="active">Etymology</a>
+                <a href="index.html#download">Download</a>
+            </nav>
+        </header>
+
+        <main class="try-main">
+            <div class="try-interface">
+                <div class="input-section etymo-inputs">
+                    <h2>Trace Etymology</h2>
+                    <div class="input-container">
+                        <input type="text" id="etymo-input" placeholder="Enter a word (e.g., algorithm, democracy, pandemic)" />
+                        <button id="etymo-button">Trace Etymology</button>
+                    </div>
+                    <div class="examples">
+                        <p>Try examples:</p>
+                        <div class="example-tags">
+                            <button class="example-tag" data-word="algorithm">algorithm</button>
+                            <button class="example-tag" data-word="democracy">democracy</button>
+                            <button class="example-tag" data-word="quarantine">quarantine</button>
+                            <button class="example-tag" data-word="robot">robot</button>
+                            <button class="example-tag" data-word="utopia">utopia</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-section">
+                    <div id="loading-state" class="loading-state" style="display: none;">
+                        <div class="loading-content">
+                            <div class="loading-spinner"></div>
+                            <p id="loading-message">consulting etymological sources...</p>
+                            <p id="progress-indicator" class="progress-text">parsing entries and cross-references</p>
+                        </div>
+                    </div>
+
+                    <div id="error-state" class="error-state" style="display: none;">
+                        <h3>Unable to Complete Etymology</h3>
+                        <p id="error-message">An error occurred while tracing the word.</p>
+                        <button id="retry-button">Try Again</button>
+                    </div>
+
+                    <div id="results-container" class="results-container" style="display: none;">
+                        <div id="search-term-display" class="search-term-display">
+                            <h3>Etymology of: <span id="search-term"></span></h3>
+                        </div>
+
+                        <!-- Morphology visualization -->
+                        <section class="morph-visual" id="morph-visual" style="display:none;">
+                            <div class="morph-word" id="morph-word"></div>
+                            <div class="morph-glosses" id="morph-glosses"></div>
+                        </section>
+
+                        <!-- Filters / modes -->
+                        <div class="filter-controls">
+                            <label class="filter-item"><input type="checkbox" id="filter-crucial" checked> show only crucial shifts</label>
+                        </div>
+
+                        <!-- Single section: Meaning trajectory (shifts only) -->
+                        <section id="meaning-section" class="meaning-section" style="display:none;">
+                            <h3>Meaning Trajectory</h3>
+                            <div class="trace-container">
+                                <div class="trace-items">
+                                    <div id="meaning-output" class="trace-output"></div>
+                                </div>
+                                <div id="timeline" class="timeline">
+                                    <div class="timeline-line"></div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="etymo-actions">
+                            <button id="copy-all-button" class="copy-all-button">Copy Results</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <div class="footer-content">
+                <div class="footer-text">
+                    <p>"There are no facts, only interpretations." <em>— Nietzsche</em></p>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/simonkral1/genealogy-tracer">GitHub</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="etymology.js"></script>
+    </body>
+    </html>
+
+

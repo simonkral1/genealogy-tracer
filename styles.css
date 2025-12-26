@@ -520,7 +520,8 @@ code {
     border-color: var(--color-text-light);
 }
 
-#trace-button {
+#trace-button,
+#etymo-button {
     padding: var(--spacing-md) var(--spacing-lg);
     background: var(--color-text-dark);
     color: var(--color-bg);
@@ -533,12 +534,14 @@ code {
     transition: all 0.2s ease;
 }
 
-#trace-button:hover {
+#trace-button:hover,
+#etymo-button:hover {
     background: var(--color-accent);
     border-color: var(--color-accent);
 }
 
-#trace-button:disabled {
+#trace-button:disabled,
+#etymo-button:disabled {
     background: var(--color-border);
     border-color: var(--color-border);
     cursor: not-allowed;
@@ -682,6 +685,65 @@ code {
 .copy-all-button:hover {
     background: var(--color-bg-light);
     border-color: var(--color-text-light);
+}
+
+/* Etymology badges */
+.badge {
+    display: inline-block;
+    border: 1px solid var(--color-border);
+    padding: 2px 6px;
+    font-size: 10px;
+    margin-right: var(--spacing-sm);
+}
+.category-root { background: #f6faff; }
+.category-borrow { background: #f9f6ff; }
+.category-shift { background: #f6fff9; }
+.category-cognate { background: #fffaf6; }
+.category-quote { background: #fefef6; }
+
+/* Morphology visual */
+.morph-visual {
+    background: var(--color-bg-light);
+    border: 1px solid var(--color-border-light);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+.morph-word {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-bottom: var(--spacing-sm);
+}
+.morph-part {
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    position: relative;
+}
+.morph-part::after { display: none; }
+.morph-glosses {
+    text-align: center;
+    color: var(--color-text-light);
+    font-style: italic;
+    font-size: 12px;
+}
+
+/* Meaning trajectory */
+.meaning-section .trace-output .trace-item {
+    border-left: 3px solid var(--color-text-dark);
+}
+
+/* Filters */
+.filter-controls {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+.filter-item {
+    font-size: 12px;
+    color: var(--color-text-light);
 }
 
 .trace-container {
@@ -1045,4 +1107,136 @@ footer {
 .loading-dots::after {
     content: '...';
     animation: dots 1.5s infinite;
+}
+
+/* Etymology Page Styles */
+.morph-visual {
+    background: var(--color-bg-light);
+    border: 1px solid var(--color-border-light);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    text-align: center;
+}
+
+.morph-word {
+    font-size: 24px;
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.morph-part {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-weight: bold;
+}
+
+.morph-separator {
+    color: var(--color-text-light);
+    font-size: 18px;
+}
+
+.morph-glosses {
+    font-size: 12px;
+    color: var(--color-text-light);
+    font-style: italic;
+}
+
+.filter-controls {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background: var(--color-bg-light);
+    border: 1px solid var(--color-border-light);
+}
+
+.filter-item {
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.filter-item input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.meaning-section {
+    margin-top: var(--spacing-lg);
+}
+
+.meaning-section h3 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: var(--spacing-md);
+    color: var(--color-text-light);
+}
+
+.etymology-item {
+    background: var(--color-bg-light);
+    border: 1px solid var(--color-border-light);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.etymology-item.crucial {
+    border-left: 3px solid var(--color-text-dark);
+}
+
+.etymology-item .item-header {
+    margin-bottom: var(--spacing-sm);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.etymology-item .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid var(--color-border);
+}
+
+.etymology-item .badge.category-root { background: #f0f4ff; border-color: #c0d0ff; }
+.etymology-item .badge.category-borrow { background: #f4f0ff; border-color: #d0c0ff; }
+.etymology-item .badge.category-shift { background: #f0fff4; border-color: #c0ffd0; }
+.etymology-item .badge.category-cognate { background: #fff4f0; border-color: #ffd0c0; }
+.etymology-item .badge.category-quote { background: #fffef0; border-color: #fff0c0; }
+
+.etymology-item .badge.confidence-high { color: #2a5; }
+.etymology-item .badge.confidence-medium { color: #a82; }
+.etymology-item .badge.confidence-low { color: #a55; }
+
+.etymology-item .date {
+    color: var(--color-text-light);
+    font-size: 12px;
+}
+
+.etymology-item .item-gloss {
+    font-weight: bold;
+    margin-bottom: var(--spacing-xs);
+}
+
+.etymology-item .item-essence {
+    color: var(--color-text);
+    line-height: 1.5;
+}
+
+.etymology-item .item-note {
+    margin-top: var(--spacing-sm);
+    font-size: 12px;
+    color: var(--color-text-light);
+}
+
+.etymology-item .source-link {
+    font-size: 11px;
+    color: var(--color-text-light);
 } 

@@ -9,3 +9,7 @@ yarn-error.log
 # Build artifacts (if any specific to your worker build)
 # dist/
 # .wrangler/ 
+.secrets/
+.dev.vars
+.env
+.env.*
