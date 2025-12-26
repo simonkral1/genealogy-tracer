@@ -374,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function () {
         button.textContent = 'expanding...';
         
         try {
-            const response = await fetch('http://localhost:8787/expand', {
+            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/expand', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -562,7 +562,7 @@ document.addEventListener('DOMContentLoaded', function () {
         showLoading();
 
         try {
-            const response = await fetch('http://localhost:8787/stream', {
+            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/plain',
@@ -840,7 +840,7 @@ document.addEventListener('DOMContentLoaded', function () {
         showLoading('Searching for alternative perspectives');
 
         try {
-            const response = await fetch('http://localhost:8787/reinterpret', {
+            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/reinterpret', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
