@@ -112,16 +112,16 @@ document.addEventListener('DOMContentLoaded', function () {
     // Cache functions using localStorage
     const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
-    function getCachedResponse(text) {
-        const cacheKey = `concept_tracer_${text.toLowerCase().trim()}`;
+    function getCachedResponse(text, model) {
+        const cacheKey = `concept_tracer_${text.toLowerCase().trim()}_${model || 'default'}`;
         try {
             const cachedData = localStorage.getItem(cacheKey);
             if (cachedData) {
                 const parsedData = JSON.parse(cachedData);
                 const now = Date.now();
-                
+
                 if (now - parsedData.timestamp < CACHE_DURATION) {
-                    console.log('Using cached response for:', text);
+                    console.log('Using cached response for:', text, 'model:', model);
                     return parsedData.response;
                 } else {
                     localStorage.removeItem(cacheKey);
@@ -134,17 +134,18 @@ document.addEventListener('DOMContentLoaded', function () {
         return null;
     }
 
-    function setCachedResponse(text, response) {
-        const cacheKey = `concept_tracer_${text.toLowerCase().trim()}`;
+    function setCachedResponse(text, model, response) {
+        const cacheKey = `concept_tracer_${text.toLowerCase().trim()}_${model || 'default'}`;
         const cachedData = {
             response: response,
             timestamp: Date.now(),
-            originalText: text
+            originalText: text,
+            model: model
         };
-        
+
         try {
             localStorage.setItem(cacheKey, JSON.stringify(cachedData));
-            console.log('Cached response for:', text);
+            console.log('Cached response for:', text, 'model:', model);
         } catch (error) {
             console.error('Error caching response:', error);
         }
@@ -464,8 +465,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         try {
-            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4';
-            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/expand', {
+            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4-5-20250929';
+            const response = await fetch('http://localhost:54308/expand', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -632,7 +633,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 genealogy: streamedItems,
                 questions: streamedQuestions
             };
-            setCachedResponse(currentQuery, cacheData);
+            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4-5-20250929';
+            setCachedResponse(currentQuery, selectedModel, cacheData);
         }
         
         // Re-enable trace button
@@ -669,8 +671,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         try {
-            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4';
-            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/stream', {
+            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4-5-20250929';
+            const response = await fetch('http://localhost:54308/stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -823,8 +825,9 @@ document.addEventListener('DOMContentLoaded', function () {
             latestYear: null
         };
 
-        // Check cache first
-        const cachedResponse = getCachedResponse(currentQuery);
+        // Check cache first (include model in cache key)
+        const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4';
+        const cachedResponse = getCachedResponse(currentQuery, selectedModel);
         if (cachedResponse && cachedResponse.genealogy && cachedResponse.genealogy.length > 0) {
             displayCachedResults(cachedResponse);
             return;
@@ -964,7 +967,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         try {
-            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/reinterpret', {
+            const response = await fetch('http://localhost:54308/reinterpret', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

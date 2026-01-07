@@ -22,7 +22,7 @@ interface Env {
 import { getWikidataContext, type WikidataWork } from './wikidata';
 
 // Allowed models for user selection (Anthropic defaults) – Hyperbolic handled by name heuristics
-const ALLOWED_MODELS = ['claude-sonnet-4', 'claude-haiku-4-5', 'claude-opus-4-5-20251101'];
+const ALLOWED_MODELS = ['claude-sonnet-4-5-20250929', 'claude-haiku-4-5', 'claude-opus-4-5-20251101'];
 const DEFAULT_MODEL = 'claude-opus-4-5-20251101';
 
 function getValidModel(requestModel: string | undefined): string {
@@ -213,6 +213,148 @@ Format your response using XML tags for easy parsing:
 </genealogy>`;
 }
 
+// Streaming function that yields items as they are parsed
+async function streamFromModel(
+	prompt: string,
+	model: string,
+	env: Env,
+	onItem: (item: GenealogyItem) => void,
+	onQuestion: (question: string) => void
+): Promise<void> {
+	const isHyperbolic = isHyperbolicModel(model);
+
+	let apiUrl: string;
+	let headers: Record<string, string>;
+	let body: any;
+
+	if (isHyperbolic) {
+		if (!env.HYPERBOLIC_API_KEY) {
+			throw new Error('Hyperbolic API key not set');
+		}
+		apiUrl = 'https://api.hyperbolic.xyz/v1/chat/completions';
+		headers = {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${env.HYPERBOLIC_API_KEY}`,
+		};
+		body = {
+			model,
+			messages: [{ role: 'user', content: prompt }],
+			max_tokens: 2000,
+			temperature: 0.7,
+			stream: true,
+		};
+	} else {
+		if (!env.ANTHROPIC_API_KEY) {
+			throw new Error('Anthropic API key not set');
+		}
+		apiUrl = 'https://api.anthropic.com/v1/messages';
+		headers = {
+			'Content-Type': 'application/json',
+			'x-api-key': env.ANTHROPIC_API_KEY,
+			'anthropic-version': '2023-06-01',
+		};
+		body = {
+			model,
+			messages: [{ role: 'user', content: prompt }],
+			max_tokens: 2000,
+			stream: true,
+		};
+	}
+
+	const res = await fetch(apiUrl, {
+		method: 'POST',
+		headers,
+		body: JSON.stringify(body),
+	});
+
+	if (!res.ok) {
+		const errText = await res.text();
+		throw new Error(`${isHyperbolic ? 'Hyperbolic' : 'Anthropic'} error ${res.status}: ${errText}`);
+	}
+
+	const reader = res.body!.getReader();
+	const decoder = new TextDecoder();
+	let buffer = '';
+	let accumulator = '';
+	const processedItems = new Set<string>();
+	const processedQuestions = new Set<string>();
+
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split('\n');
+			buffer = lines.pop() || '';
+
+			for (const line of lines) {
+				if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+					try {
+						const data = JSON.parse(line.slice(6));
+
+						// Extract text delta based on provider format
+						let deltaText = '';
+						if (isHyperbolic) {
+							// OpenAI-compatible format
+							deltaText = data?.choices?.[0]?.delta?.content || '';
+						} else {
+							// Anthropic format
+							if (data.type === 'content_block_delta' && data.delta?.text) {
+								deltaText = data.delta.text;
+							}
+						}
+
+						if (deltaText) {
+							accumulator += deltaText;
+
+							// Parse complete items as they appear
+							const itemMatches = [...accumulator.matchAll(/<item>([\s\S]*?)<\/item>/g)];
+							for (const itemMatch of itemMatches) {
+								const itemXml = itemMatch[1];
+								const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/);
+								const yearMatch = itemXml.match(/<year>([\s\S]*?)<\/year>/);
+								const urlMatch = itemXml.match(/<url>([\s\S]*?)<\/url>/);
+								const explanationMatch = itemXml.match(/<explanation>([\s\S]*?)<\/explanation>/);
+
+								if (titleMatch && yearMatch && urlMatch && explanationMatch) {
+									const title = titleMatch[1].trim();
+									const year = yearMatch[1].trim();
+									const url = urlMatch[1].trim();
+									const explanation = explanationMatch[1].trim();
+									const itemKey = `${title}_${year}`;
+
+									if (!processedItems.has(itemKey) && title.length > 3 && explanation.length > 5) {
+										processedItems.add(itemKey);
+										onItem({ title, year, url, claim: explanation });
+									}
+								}
+							}
+
+							// Parse complete questions as they appear
+							const questionMatches = [...accumulator.matchAll(/<question>([\s\S]*?)<\/question>/g)];
+							for (const questionMatch of questionMatches) {
+								const questionText = questionMatch[1].trim();
+
+								if (questionText.length > 20 && questionText.length < 500 &&
+									!processedQuestions.has(questionText.toLowerCase())) {
+									processedQuestions.add(questionText.toLowerCase());
+									onQuestion(questionText);
+								}
+							}
+						}
+					} catch (e) {
+						// Skip malformed JSON
+					}
+				}
+			}
+		}
+	} finally {
+		reader.releaseLock();
+	}
+}
+
+// Non-streaming version for backward compatibility
 async function callModel(prompt: string, model: string, env: Env): Promise<string> {
 	if (isHyperbolicModel(model)) {
 		if (!env.HYPERBOLIC_API_KEY) {
@@ -436,22 +578,24 @@ export default {
 							send({ type: 'status', message: 'Building prompt' });
 							const prompt = buildGenealogyPrompt(query, titles, wikidataWorks);
 
-							send({ type: 'status', message: `Calling ${providerName}` });
-							const rawContent = await callModel(prompt, model, env);
+							send({ type: 'status', message: `Streaming from ${providerName}` });
 
-							send({ type: 'status', message: 'Parsing response' });
-							const parsed = parseGenealogyText(extractGenealogyContent(rawContent));
-
-							for (const item of parsed.items) {
-								send({ type: 'genealogy_item', ...item });
-							}
-
-							if (parsed.questions.length) {
-								send({ type: 'section', section: 'questions' });
-								for (const question of parsed.questions) {
+							let questionsSectionSent = false;
+							await streamFromModel(
+								prompt,
+								model,
+								env,
+								(item) => {
+									send({ type: 'genealogy_item', ...item });
+								},
+								(question) => {
+									if (!questionsSectionSent) {
+										send({ type: 'section', section: 'questions' });
+										questionsSectionSent = true;
+									}
 									send({ type: 'question', text: question });
 								}
-							}
+							);
 
 							send({ type: 'complete' });
 						} catch (error: any) {
@@ -677,48 +821,16 @@ Remember, your primary goal is to make this complex idea accessible to a general
 
 Your final output should be just the explanation, without any additional commentary or meta-discussion. Present your explanation within <explanation> tags.`;
 
-				// Call Anthropic API
-				const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
-				const anthropicApiKey = env.ANTHROPIC_API_KEY;
-
-				if (!anthropicApiKey) {
-					return new Response(JSON.stringify({ error: 'Anthropic API key not configured' }), {
-						status: 500,
-						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-					});
-				}
-
-				const llmRes = await fetch(anthropicApiUrl, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'x-api-key': anthropicApiKey,
-						'anthropic-version': '2023-06-01',
-					},
-					body: JSON.stringify({
-						model: model,
-						messages: [{ role: 'user', content: prompt }],
-						max_tokens: 800,
-					}),
-				});
-
-				if (!llmRes.ok) {
-					const errorBody = await llmRes.text();
-					console.error('Claude API error:', llmRes.status, errorBody);
-					return new Response(JSON.stringify({ error: `AI service error: ${llmRes.status}` }), {
-						status: 500,
-						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-					});
-				}
-
-				const llmJson = (await llmRes.json()) as any;
-				
+				// Call model (supports both Anthropic and Hyperbolic)
 				let expandedContent = '';
-				if (llmJson.content && Array.isArray(llmJson.content) && llmJson.content.length > 0) {
-					const textBlock = llmJson.content.find((block: any) => block.type === 'text');
-					if (textBlock && textBlock.text) {
-						expandedContent = textBlock.text.trim();
-					}
+				try {
+					expandedContent = await callModel(prompt, model, env);
+				} catch (err: any) {
+					console.error('Model API error:', err);
+					return new Response(JSON.stringify({ error: `AI service error: ${err.message}` }), {
+						status: 500,
+						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+					});
 				}
 
 				if (!expandedContent) {
@@ -875,149 +987,26 @@ Format your response using XML tags for easy parsing:
 </questions>
 </genealogy>`;
 
-							// Inform client that we are about to call the language model
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Generating alternative genealogy"}\n\n`));
+							// Stream from model (supports both Anthropic and Hyperbolic)
+							const providerName = isHyperbolicModel(model) ? 'Hyperbolic' : 'Anthropic';
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Streaming from ${providerName}"}\n\n`));
 
-							// Call Anthropic API with streaming
-							const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
-							const anthropicApiKey = env.ANTHROPIC_API_KEY;
-
-							if (!anthropicApiKey) {
-								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"Anthropic API key not set"}\n\n`));
-								controller.close();
-								return;
-							}
-
-							const llmRes = await fetch(anthropicApiUrl, {
-								method: 'POST',
-								headers: {
-									'Content-Type': 'application/json',
-									'x-api-key': anthropicApiKey,
-									'anthropic-version': '2023-06-01',
+							let questionsSectionSent = false;
+							await streamFromModel(
+								prompt,
+								model,
+								env,
+								(item) => {
+									controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'genealogy_item', ...item })}\n\n`));
 								},
-								body: JSON.stringify({
-									model: model,
-									messages: [{ role: 'user', content: prompt }],
-									max_tokens: 1500,
-									stream: true
-								}),
-							});
-
-							if (!llmRes.ok) {
-								const errorBody = await llmRes.text();
-								console.error('Claude API error:', llmRes.status);
-								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"AI service error: ${llmRes.status}"}\n\n`));
-								controller.close();
-								return;
-							}
-
-							// Process Claude's streaming response (same logic as /stream endpoint)
-							const reader = llmRes.body!.getReader();
-							const decoder = new TextDecoder();
-							let buffer = '';
-							let accumulator = '';
-							const processedItems = new Set();
-							const processedQuestions = new Set();
-
-							try {
-								while (true) {
-									const { done, value } = await reader.read();
-									if (done) break;
-
-									buffer += decoder.decode(value, { stream: true });
-									const lines = buffer.split('\n');
-									buffer = lines.pop() || '';
-
-									for (const line of lines) {
-										if (line.startsWith('data: ')) {
-											try {
-												const data = JSON.parse(line.slice(6));
-												
-												if (data.type === 'content_block_delta' && data.delta?.text) {
-													accumulator += data.delta.text;
-													
-													console.log('🔍 Reinterpret: Looking for items in:', accumulator.slice(-500));
-													
-													// Parse XML-formatted genealogy items
-													const itemMatches = [...accumulator.matchAll(/<item>([\s\S]*?)<\/item>/g)];
-													for (const itemMatch of itemMatches) {
-														const itemXml = itemMatch[1];
-														const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
-														const yearMatch = itemXml.match(/<year>(.*?)<\/year>/);
-														const urlMatch = itemXml.match(/<url>(.*?)<\/url>/);
-														const explanationMatch = itemXml.match(/<explanation>([\s\S]*?)<\/explanation>/);
-														
-														if (titleMatch && yearMatch && urlMatch && explanationMatch) {
-															const title = titleMatch[1].trim();
-															const year = yearMatch[1].trim();
-															const url = urlMatch[1].trim();
-															const explanation = explanationMatch[1].trim();
-															const itemKey = `${title}_${year}`;
-															
-															console.log('🎯 Reinterpret: Found XML item:', { title, year, url, explanation: explanation.slice(0, 100) + '...' });
-															
-															if (!processedItems.has(itemKey) && 
-																title.length > 3 && 
-																explanation.length > 5) {
-																processedItems.add(itemKey);
-																
-																const item = {
-																	type: "genealogy_item",
-																	title: title,
-																	year: year,
-																	url: url,
-																	claim: explanation
-																};
-																
-																console.log('✅ Reinterpret: Sending item:', item);
-																controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(item)}\n\n`));
-															} else {
-																console.log('❌ Reinterpret: Rejected item:', { 
-																	itemKey, 
-																	alreadyProcessed: processedItems.has(itemKey), 
-																	titleLength: title.length, 
-																	explanationLength: explanation.length 
-																});
-															}
-														}
-													}
-													
-													// Parse XML-formatted questions
-													const questionMatches = [...accumulator.matchAll(/<question>(.*?)<\/question>/g)];
-													for (const questionMatch of questionMatches) {
-														const questionText = questionMatch[1].trim();
-														
-														console.log('🔍 Reinterpret: Found question:', questionText);
-														
-														if (questionText.length > 30 && 
-															questionText.length < 400 && 
-															!processedQuestions.has(questionText.toLowerCase())) {
-															processedQuestions.add(questionText.toLowerCase());
-															
-															// Send questions section signal first time we find questions
-															if (processedQuestions.size === 1) {
-																controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
-															}
-															
-															const question = {
-																type: "question",
-																text: questionText
-															};
-															
-															console.log('✅ Reinterpret: Sending question:', question);
-															controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(question)}\n\n`));
-														}
-													}
-												}
-											} catch (e) {
-												// Skip malformed JSON
-											}
-										}
+								(question) => {
+									if (!questionsSectionSent) {
+										controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
+										questionsSectionSent = true;
 									}
+									controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'question', text: question })}\n\n`));
 								}
-							} finally {
-								reader.releaseLock();
-							}
+							);
 
 							// Send completion signal
 							controller.enqueue(new TextEncoder().encode(`data: {"type":"complete"}\n\n`));

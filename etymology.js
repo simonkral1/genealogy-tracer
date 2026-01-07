@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutId = setTimeout(() => controller.abort(), 60000);
 
         try {
-            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4';
+            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4-5-20250929';
             const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/etymology', {
                 method: 'POST',
                 headers: {
