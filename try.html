@@ -8,6 +8,10 @@
     <link rel="icon" type="image/png" sizes="16x16" href="icons/icon16.png">
     <link rel="icon" type="image/png" sizes="48x48" href="icons/icon48.png">
     <link rel="icon" type="image/png" sizes="128x128" href="icons/icon128.png">
+    <!-- D3.js for network preview -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Cloudflare Turnstile for rate limit captcha -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
     <div class="container">
@@ -22,6 +26,7 @@
                 <a href="about.html">About</a>
                 <a href="try.html">Trace Online</a>
                 <a href="etymology.html">Etymology</a>
+                <a href="network.html">Network</a>
                 <a href="index.html#download">Download</a>
             </nav>
         </header>
@@ -31,7 +36,7 @@
                 <div class="input-section">
                     <h2>Trace a Concept</h2>
                     <div class="input-container">
-                        <input type="text" id="concept-input" placeholder="Enter a concept, idea, or text to trace..." />
+                        <input type="text" id="concept-input" placeholder="Enter a concept, idea, or text to trace..." maxlength="200" minlength="2" />
                         <button id="trace-button">Trace Genealogy</button>
                     </div>
                     <div class="examples">
@@ -86,6 +91,15 @@
                                 <ul id="questions-list"></ul>
                             </div>
                         </div>
+
+                        <!-- Network Preview -->
+                        <div id="network-preview-section" class="network-preview-container" style="display: none;">
+                            <div class="network-preview-header">
+                                <h4>Network View</h4>
+                                <button id="expand-network-btn" class="action-btn">Expand in Full View</button>
+                            </div>
+                            <div id="network-preview" class="network-preview-canvas"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -101,6 +115,16 @@
                 </div>
             </div>
         </footer>
+    </div>
+
+    <!-- Captcha Modal (shown when rate limited) -->
+    <div id="captcha-modal" class="captcha-modal" style="display: none;">
+        <div class="captcha-content">
+            <h3>Verification Required</h3>
+            <p>You've made many requests. Please verify you're human to continue.</p>
+            <div id="turnstile-container" class="cf-turnstile" data-sitekey="REPLACE_WITH_TURNSTILE_SITE_KEY" data-callback="onTurnstileSuccess"></div>
+            <button id="captcha-cancel" class="captcha-cancel-btn">Cancel</button>
+        </div>
     </div>
 
     <script src="try.js"></script>

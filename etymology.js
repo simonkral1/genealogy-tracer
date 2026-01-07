@@ -173,33 +173,79 @@ document.addEventListener('DOMContentLoaded', function () {
 
         meaningOutput.appendChild(itemDiv);
 
-        // Add timeline marker
-        if (item.dateOrCentury) {
-            addTimelineItem(item.dateOrCentury, index);
-        }
-
         // Apply filter
         applyFilter();
+
+        // Update streaming counter
+        updateStreamingProgress();
     }
 
-    function addTimelineItem(date, itemIndex) {
-        if (!timeline || !date) return;
+    // Show streaming progress while items come in
+    function updateStreamingProgress() {
+        const progressEl = document.getElementById('progress-indicator');
+        if (progressEl && isStreaming) {
+            progressEl.textContent = `received ${streamedItems.length} etymology entries...`;
+        }
+    }
 
-        const timelineItem = document.createElement('div');
-        timelineItem.className = 'timeline-item';
+    // Rebuild timeline with proper spacing - only show crucial items or limit to ~6 dates
+    function rebuildTimeline() {
+        if (!timeline) return;
+
+        // Clear existing timeline items
+        const existingItems = timeline.querySelectorAll('.timeline-item');
+        existingItems.forEach(item => item.remove());
+
+        // Get items to show on timeline - prefer crucial items
+        const crucialItems = streamedItems.filter(item => item.crucial && item.dateOrCentury);
+        const itemsForTimeline = crucialItems.length >= 3
+            ? crucialItems
+            : streamedItems.filter(item => item.dateOrCentury).slice(0, 6);
+
+        if (itemsForTimeline.length === 0) return;
 
         const totalHeight = timeline.offsetHeight || 400;
-        const padding = 20;
+        const padding = 30;
         const availableHeight = totalHeight - (2 * padding);
-        const position = padding + (itemIndex * (availableHeight / Math.max(streamedItems.length, 1)));
 
-        timelineItem.style.top = `${position}px`;
-        timelineItem.innerHTML = `
-            <div class="timeline-dot"></div>
-            <div class="timeline-year">${date}</div>
-        `;
+        itemsForTimeline.forEach((item, idx) => {
+            const timelineItem = document.createElement('div');
+            timelineItem.className = 'timeline-item';
+            if (item.crucial) {
+                timelineItem.classList.add('crucial');
+            }
 
-        timeline.appendChild(timelineItem);
+            const position = padding + (idx * (availableHeight / Math.max(itemsForTimeline.length - 1, 1)));
+            timelineItem.style.top = `${position}px`;
+
+            // Simplify date display (extract just the century/year)
+            const shortDate = simplifyDate(item.dateOrCentury);
+
+            timelineItem.innerHTML = `
+                <div class="timeline-dot"></div>
+                <div class="timeline-year">${shortDate}</div>
+            `;
+
+            timeline.appendChild(timelineItem);
+        });
+    }
+
+    // Simplify date strings for timeline display
+    function simplifyDate(date) {
+        if (!date) return '';
+        // Extract just century or year from longer strings
+        const centuryMatch = date.match(/(\d+)(?:st|nd|rd|th)?\s*c(?:entury)?\.?\s*(?:BCE|CE|BC|AD)?/i);
+        if (centuryMatch) {
+            const suffix = date.toLowerCase().includes('bce') || date.toLowerCase().includes('bc') ? ' BCE' : '';
+            return centuryMatch[1] + 'c' + suffix;
+        }
+        const yearMatch = date.match(/(\d{3,4})\s*(?:BCE|CE|BC|AD)?/);
+        if (yearMatch) {
+            const suffix = date.toLowerCase().includes('bce') || date.toLowerCase().includes('bc') ? ' BCE' : '';
+            return yearMatch[1] + suffix;
+        }
+        // Truncate if too long
+        return date.length > 12 ? date.substring(0, 10) + '...' : date;
     }
 
     function applyFilter() {
@@ -216,9 +262,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function traceEtymology(word) {
-        if (!word.trim() || isStreaming) return;
+        const trimmed = word.trim();
+        if (!trimmed || isStreaming) return;
+        if (trimmed.length < 2) {
+            showError('Please enter at least 2 characters.');
+            return;
+        }
 
-        currentWord = word.trim();
+        currentWord = trimmed;
         isStreaming = true;
         clearResults();
 
@@ -227,13 +278,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         showLoading();
 
+        // Create abort controller for timeout (60 seconds for etymology)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+
         try {
-            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/etymology', {
+            const response = await fetch('http://localhost:8787/etymology', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/plain',
                 },
-                body: currentWord
+                body: currentWord,
+                signal: controller.signal
             });
 
             if (!response.ok) {
@@ -276,6 +332,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                 throw new Error(data.message);
                             } else if (data.type === 'complete') {
                                 console.log('Etymology trace complete');
+                                // Rebuild timeline with proper spacing after all items received
+                                rebuildTimeline();
                             }
                         } catch (parseError) {
                             if (parseError.message && !parseError.message.includes('JSON')) {
@@ -288,11 +346,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         } catch (error) {
             console.error('Etymology error:', error);
-            showError(error.message || 'Failed to trace etymology');
+            const errorMsg = error.name === 'AbortError'
+                ? 'Request timed out. Please try again.'
+                : (error.message || 'Failed to trace etymology');
+            showError(errorMsg);
         } finally {
+            clearTimeout(timeoutId);
             isStreaming = false;
             etymoButton.disabled = false;
             etymoButton.textContent = 'Trace Etymology';
+
+            // Rebuild timeline if we have items (fallback in case complete event not received)
+            if (streamedItems.length > 0) {
+                rebuildTimeline();
+            }
+
+            // Handle empty results
+            if (streamedItems.length === 0 && !morphologyData) {
+                showError(`No etymology found for "${currentWord}". Try a different word.`);
+            }
         }
     }
 
@@ -350,13 +422,38 @@ document.addEventListener('DOMContentLoaded', function () {
                 text += '\n';
             });
 
-            navigator.clipboard.writeText(text).then(() => {
-                const originalText = copyAllButton.textContent;
-                copyAllButton.textContent = 'Copied!';
+            const originalText = copyAllButton.textContent;
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    copyAllButton.textContent = 'Copied!';
+                    setTimeout(() => {
+                        copyAllButton.textContent = originalText;
+                    }, 2000);
+                }).catch(() => {
+                    copyAllButton.textContent = 'Copy failed';
+                    setTimeout(() => {
+                        copyAllButton.textContent = originalText;
+                    }, 2000);
+                });
+            } else {
+                // Fallback for non-HTTPS
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    copyAllButton.textContent = 'Copied!';
+                } catch (err) {
+                    copyAllButton.textContent = 'Copy failed';
+                }
+                document.body.removeChild(textArea);
                 setTimeout(() => {
                     copyAllButton.textContent = originalText;
                 }, 2000);
-            });
+            }
         });
     }
 });

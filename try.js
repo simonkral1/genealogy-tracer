@@ -13,18 +13,100 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchTermDisplay = document.getElementById('search-term');
     const copyAllButton = document.getElementById('copy-all-button');
     const retryButton = document.getElementById('retry-button');
+    const captchaModal = document.getElementById('captcha-modal');
+    const captchaCancelBtn = document.getElementById('captcha-cancel');
 
     // State
     let currentQuery = '';
     let streamedItems = [];
     let streamedQuestions = [];
     let isStreaming = false; // Add flag to track streaming state
+    let turnstileToken = null; // Store captcha token for rate-limited requests
+    let pendingAction = null; // Store action to retry after captcha
     let traceStats = {
         itemCount: 0,
         questionCount: 0,
         earliestYear: null,
         latestYear: null
     };
+
+    // Captcha functions
+    function showCaptchaModal(actionToRetry) {
+        pendingAction = actionToRetry;
+        if (captchaModal) {
+            captchaModal.style.display = 'flex';
+            // Reset turnstile widget if it exists
+            if (window.turnstile) {
+                const container = document.getElementById('turnstile-container');
+                if (container) {
+                    container.innerHTML = '';
+                    window.turnstile.render(container, {
+                        sitekey: container.getAttribute('data-sitekey'),
+                        callback: onTurnstileSuccess
+                    });
+                }
+            }
+        }
+    }
+
+    function hideCaptchaModal() {
+        if (captchaModal) {
+            captchaModal.style.display = 'none';
+        }
+        pendingAction = null;
+    }
+
+    // Global callback for Turnstile
+    window.onTurnstileSuccess = function(token) {
+        turnstileToken = token;
+        hideCaptchaModal();
+        // Retry the pending action with the token
+        if (pendingAction === 'trace') {
+            performTraceApiCall();
+        } else if (pendingAction === 'reinterpret') {
+            performReinterpret();
+        }
+    };
+
+    // Cancel button handler
+    if (captchaCancelBtn) {
+        captchaCancelBtn.addEventListener('click', () => {
+            hideCaptchaModal();
+            isStreaming = false;
+            traceButton.disabled = false;
+            traceButton.textContent = 'Trace Genealogy';
+        });
+    }
+
+    // Helper to get headers including turnstile token if available
+    function getRequestHeaders(contentType = 'text/plain') {
+        const headers = { 'Content-Type': contentType };
+        if (turnstileToken) {
+            headers['X-Turnstile-Token'] = turnstileToken;
+        }
+        return headers;
+    }
+
+    // Handle rate limit responses
+    async function handleRateLimitResponse(response, actionType) {
+        if (response.status === 429) {
+            try {
+                const data = await response.json();
+                if (data.code === 'CAPTCHA_REQUIRED' || data.code === 'CAPTCHA_INVALID') {
+                    turnstileToken = null; // Clear invalid token
+                    showCaptchaModal(actionType);
+                    return true; // Handled
+                } else if (data.code === 'BLOCKED') {
+                    showError('Too many requests. Please wait an hour before trying again.');
+                    return true;
+                }
+            } catch {
+                showError('Rate limit exceeded. Please try again later.');
+                return true;
+            }
+        }
+        return false; // Not a rate limit response
+    }
 
     // Cache functions using localStorage
     const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -137,8 +219,11 @@ document.addEventListener('DOMContentLoaded', function () {
             'Failed to fetch': 'Unable to connect to the service. Please check your internet connection.',
             'NetworkError': 'Network connection failed. Please try again.',
             'AbortError': 'Request timed out. Please try again.',
+            'TypeError': 'Service unavailable. Please try again.',
+            'SyntaxError': 'Received invalid response. Please try again.',
             'Worker returned error 429': 'Too many requests. Please wait a moment before trying again.',
-            'Worker returned error 500': 'Service temporarily unavailable. Please try again later.'
+            'Worker returned error 500': 'Service temporarily unavailable. Please try again later.',
+            'Worker returned error 503': 'Service busy. Please wait a moment and try again.'
         };
         
         let displayMessage = message;
@@ -369,12 +454,16 @@ document.addEventListener('DOMContentLoaded', function () {
     // Expand item functionality
     async function expandItem(button, item) {
         if (button.disabled) return;
-        
+
         button.disabled = true;
         button.textContent = 'expanding...';
-        
+
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
         try {
-            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/expand', {
+            const response = await fetch('http://localhost:8787/expand', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -383,7 +472,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     title: item.title,
                     year: item.year,
                     claim: item.claim
-                })
+                }),
+                signal: controller.signal
             });
 
             if (!response.ok) {
@@ -392,6 +482,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const responseData = await response.json();
             
+            clearTimeout(timeoutId);
+
             if (responseData.content) {
                 // Extract content from <explanation> tags if present
                 const explanationMatch = responseData.content.match(/<explanation>([\s\S]*?)<\/explanation>/);
@@ -418,11 +510,10 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (error) {
             console.error('Expand error:', error);
-            button.textContent = 'expand failed';
-            setTimeout(() => {
-                button.textContent = 'expand';
-                button.disabled = false;
-            }, 3000);
+            clearTimeout(timeoutId);
+            button.textContent = 'retry';
+            button.disabled = false;
+            button.onclick = () => expandItem(button, item);
         }
     }
 
@@ -461,6 +552,15 @@ document.addEventListener('DOMContentLoaded', function () {
             traceOutput.style.display = 'block';
         }
         
+        // Handle empty results
+        if (streamedItems.length === 0 && streamedQuestions.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'empty-state';
+            emptyDiv.innerHTML = `<p>No genealogy found for "<strong>${sanitizeText(currentQuery)}</strong>". Try a different concept or phrase.</p>`;
+            traceOutput.appendChild(emptyDiv);
+            return;
+        }
+
         if (streamedItems.length > 0 || streamedQuestions.length > 0) {
             // Remove any existing actions container
             const existingActions = traceOutput.querySelector('.actions-container');
@@ -558,16 +658,21 @@ document.addEventListener('DOMContentLoaded', function () {
         // Disable trace button
         traceButton.disabled = true;
         traceButton.textContent = 'Tracing...';
-        
+
         showLoading();
 
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
         try {
-            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/stream', {
+            const response = await fetch('http://localhost:8787/stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/plain',
                 },
-                body: currentQuery
+                body: currentQuery,
+                signal: controller.signal
             });
 
             if (!response.ok) {
@@ -668,16 +773,25 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Trace error:', error);
             isStreaming = false;
-            showError(error.message || 'An error occurred while tracing the concept.');
+            const errorMsg = error.name === 'AbortError'
+                ? 'Request timed out. Please try again.'
+                : (error.message || 'An error occurred while tracing the concept.');
+            showError(errorMsg);
         } finally {
+            clearTimeout(timeoutId);
             traceButton.disabled = false;
             traceButton.textContent = 'Trace Genealogy';
         }
     }
 
     async function performTrace(concept) {
-        if (!concept.trim()) {
+        const trimmed = concept.trim();
+        if (!trimmed) {
             showError('Please enter a concept to trace.');
+            return;
+        }
+        if (trimmed.length < 2) {
+            showError('Please enter at least 2 characters.');
             return;
         }
 
@@ -839,13 +953,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         showLoading('Searching for alternative perspectives');
 
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
         try {
-            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/reinterpret', {
+            const response = await fetch('http://localhost:8787/reinterpret', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(requestData)
+                body: JSON.stringify(requestData),
+                signal: controller.signal
             });
 
             if (!response.ok) {
@@ -947,8 +1066,12 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Reinterpret error:', error);
             isStreaming = false;
-            showError(error.message || 'An error occurred while reinterpreting the concept.');
+            const errorMsg = error.name === 'AbortError'
+                ? 'Request timed out. Please try again.'
+                : (error.message || 'An error occurred while reinterpreting the concept.');
+            showError(errorMsg);
         } finally {
+            clearTimeout(timeoutId);
             if (traceButton) {
                 traceButton.disabled = false;
                 traceButton.textContent = 'Trace Genealogy';
@@ -971,5 +1094,186 @@ document.addEventListener('DOMContentLoaded', function () {
     window.clearMLCache = function() {
         localStorage.removeItem('concept_tracer_machine learning');
         console.log('Cleared machine learning cache');
+    };
+
+    // ================================
+    // Network Preview
+    // ================================
+
+    class NetworkPreview {
+        constructor(containerId) {
+            this.container = document.getElementById(containerId);
+            this.nodes = [];
+            this.links = [];
+            this.simulation = null;
+            this.svg = null;
+            this.linksGroup = null;
+            this.nodesGroup = null;
+        }
+
+        render(items, query) {
+            if (!this.container || !items || items.length === 0) return;
+
+            // Show the preview section
+            const section = document.getElementById('network-preview-section');
+            if (section) section.style.display = 'block';
+
+            // Clear any existing content
+            this.container.innerHTML = '';
+
+            const rect = this.container.getBoundingClientRect();
+            const width = rect.width || 600;
+            const height = 200;
+
+            // Create SVG
+            this.svg = d3.select(this.container)
+                .append('svg')
+                .attr('width', '100%')
+                .attr('height', '100%')
+                .attr('viewBox', `0 0 ${width} ${height}`);
+
+            // Arrow marker
+            this.svg.append('defs').append('marker')
+                .attr('id', 'preview-arrow')
+                .attr('viewBox', '0 -5 10 10')
+                .attr('refX', 20)
+                .attr('refY', 0)
+                .attr('markerWidth', 6)
+                .attr('markerHeight', 6)
+                .attr('orient', 'auto')
+                .append('path')
+                .attr('d', 'M0,-4L10,0L0,4')
+                .attr('fill', '#888');
+
+            // Create groups (links below nodes)
+            this.linksGroup = this.svg.append('g').attr('class', 'links');
+            this.nodesGroup = this.svg.append('g').attr('class', 'nodes');
+
+            // Create nodes with spread positions
+            const spacing = (width - 100) / Math.max(items.length - 1, 1);
+            this.nodes = items.map((item, index) => ({
+                id: index,
+                title: item.title,
+                year: item.year,
+                x: 50 + index * spacing,
+                y: height / 2
+            }));
+
+            // Create links between consecutive nodes
+            this.links = [];
+            for (let i = 0; i < this.nodes.length - 1; i++) {
+                this.links.push({
+                    source: this.nodes[i],
+                    target: this.nodes[i + 1]
+                });
+            }
+
+            // Draw links FIRST
+            this.linksGroup.selectAll('line')
+                .data(this.links)
+                .join('line')
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y)
+                .attr('stroke', '#888')
+                .attr('stroke-width', 2)
+                .attr('marker-end', 'url(#preview-arrow)');
+
+            // Draw nodes
+            const nodeGroups = this.nodesGroup.selectAll('g')
+                .data(this.nodes)
+                .join('g')
+                .attr('transform', d => `translate(${d.x},${d.y})`);
+
+            // Node circles
+            nodeGroups.append('circle')
+                .attr('r', 12)
+                .attr('fill', '#444')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2);
+
+            // Year inside circle
+            nodeGroups.append('text')
+                .attr('dy', 4)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '8px')
+                .attr('font-weight', 'bold')
+                .attr('fill', '#fff')
+                .attr('font-family', 'Courier Prime, monospace')
+                .text(d => d.year ? d.year.toString().slice(-2) : '');
+
+            // Title below
+            nodeGroups.append('text')
+                .attr('dy', 28)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '9px')
+                .attr('fill', '#666')
+                .attr('font-family', 'Courier Prime, monospace')
+                .text(d => d.title.length > 18 ? d.title.substring(0, 16) + '...' : d.title);
+
+            // Run a quick force simulation to add some organic movement
+            this.simulation = d3.forceSimulation(this.nodes)
+                .force('link', d3.forceLink(this.links).distance(spacing * 0.9).strength(0.8))
+                .force('y', d3.forceY(height / 2).strength(0.3))
+                .force('collision', d3.forceCollide().radius(40))
+                .on('tick', () => {
+                    // Keep x mostly fixed, allow slight y variation
+                    this.nodes.forEach((d, i) => {
+                        d.x = Math.max(40, Math.min(width - 40, d.x));
+                        d.y = Math.max(40, Math.min(height - 40, d.y));
+                    });
+
+                    this.linksGroup.selectAll('line')
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+
+                    this.nodesGroup.selectAll('g')
+                        .attr('transform', d => `translate(${d.x},${d.y})`);
+                });
+
+            // Stop simulation after settling
+            setTimeout(() => {
+                if (this.simulation) this.simulation.stop();
+            }, 1000);
+        }
+    }
+
+    // Initialize network preview
+    let networkPreview = null;
+
+    // Function to render network preview after trace completes
+    function renderNetworkPreview() {
+        if (streamedItems.length === 0) return;
+
+        if (!networkPreview) {
+            networkPreview = new NetworkPreview('network-preview');
+        }
+
+        networkPreview.render(streamedItems, currentQuery);
+    }
+
+    // Expand to full network view
+    const expandNetworkBtn = document.getElementById('expand-network-btn');
+    if (expandNetworkBtn) {
+        expandNetworkBtn.addEventListener('click', () => {
+            // Save current genealogy to sessionStorage for network.html to pick up
+            const networkData = {
+                query: currentQuery,
+                items: streamedItems
+            };
+            sessionStorage.setItem('pending_network_trace', JSON.stringify(networkData));
+            window.location.href = 'network.html';
+        });
+    }
+
+    // Patch completeStreaming to also render network preview
+    const originalCompleteStreaming = completeStreaming;
+    completeStreaming = function() {
+        originalCompleteStreaming();
+        // Render network preview after a short delay
+        setTimeout(renderNetworkPreview, 300);
     };
 }); 

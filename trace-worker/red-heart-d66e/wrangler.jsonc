@@ -17,7 +17,14 @@
 	},
 	"observability": {
 		"enabled": true
-	}
+	},
+	// KV namespace for rate limiting - create with: npx wrangler kv namespace create RATE_LIMIT
+	"kv_namespaces": [
+		{
+			"binding": "RATE_LIMIT",
+			"id": "REPLACE_WITH_KV_NAMESPACE_ID"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

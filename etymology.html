@@ -9,15 +9,90 @@
     <link rel="icon" type="image/png" sizes="48x48" href="icons/icon48.png">
     <link rel="icon" type="image/png" sizes="128x128" href="icons/icon128.png">
     <style>
-        .etymo-inputs { text-align: center; margin-bottom: var(--spacing-xl); }
-        .etymo-inputs .input-container { max-width: 600px; margin-left: auto; margin-right: auto; }
-        .badge { display: inline-block; border: 1px solid var(--color-border); padding: 2px 6px; font-size: 10px; margin-right: 6px; }
-        .category-root { background: #f6faff; }
-        .category-borrow { background: #f9f6ff; }
-        .category-shift { background: #f6fff9; }
-        .category-cognate { background: #fffaf6; }
-        .category-quote { background: #fefef6; }
-        .etymo-actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+        /* Etymology page specific styles */
+        .etymo-inputs {
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+            padding: var(--spacing-xl) var(--spacing-md);
+        }
+        .etymo-inputs h2 {
+            margin-bottom: var(--spacing-lg);
+            font-size: 24px;
+            font-weight: normal;
+            letter-spacing: 2px;
+        }
+        .etymo-inputs .input-container {
+            max-width: 600px;
+            margin: 0 auto var(--spacing-lg);
+            display: flex;
+            gap: var(--spacing-md);
+            justify-content: center;
+        }
+        .etymo-inputs #etymo-input {
+            flex: 1;
+            max-width: 400px;
+            padding: var(--spacing-md);
+            font-size: 14px;
+            border: 1px solid var(--color-border);
+            font-family: var(--font-mono);
+        }
+        .etymo-inputs #etymo-input:focus {
+            outline: none;
+            border-color: var(--color-text-light);
+        }
+        .etymo-inputs .examples {
+            margin-top: var(--spacing-md);
+        }
+        .etymo-inputs .examples p {
+            color: var(--color-text-light);
+            font-size: 12px;
+            margin-bottom: var(--spacing-sm);
+        }
+        .etymo-inputs .example-tags {
+            display: flex;
+            gap: var(--spacing-sm);
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .badge { display: inline-block; border: 1px solid var(--color-border); padding: 2px 6px; font-size: 10px; margin-right: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .category-root { background: #f6faff; border-color: #d0e0f0; }
+        .category-borrow { background: #f9f6ff; border-color: #e0d0f0; }
+        .category-shift { background: #f0fff4; border-color: #c0e8d0; }
+        .category-cognate { background: #fffaf6; border-color: #f0e0d0; }
+        .category-quote { background: #fefef6; border-color: #e8e8d0; }
+        .etymo-actions { display: flex; gap: 10px; justify-content: center; margin-top: var(--spacing-lg); }
+
+        /* Results container centering */
+        .results-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 var(--spacing-md);
+        }
+        .search-term-display {
+            text-align: center;
+            margin-bottom: var(--spacing-lg);
+        }
+        .search-term-display h3 {
+            font-size: 18px;
+            font-weight: normal;
+        }
+        .search-term-display span {
+            font-style: italic;
+        }
+        .filter-controls {
+            text-align: center;
+            margin-bottom: var(--spacing-lg);
+            padding: var(--spacing-sm) 0;
+            border-bottom: 1px solid var(--color-border-light);
+        }
+        .filter-item {
+            font-size: 12px;
+            color: var(--color-text-light);
+            cursor: pointer;
+        }
+        .filter-item input {
+            margin-right: var(--spacing-xs);
+        }
     </style>
 </head>
 <body>
@@ -33,6 +108,7 @@
                 <a href="about.html">About</a>
                 <a href="try.html">Trace Online</a>
                 <a href="etymology.html" class="active">Etymology</a>
+                <a href="network.html">Network</a>
                 <a href="index.html#download">Download</a>
             </nav>
         </header>
@@ -42,7 +118,7 @@
                 <div class="input-section etymo-inputs">
                     <h2>Trace Etymology</h2>
                     <div class="input-container">
-                        <input type="text" id="etymo-input" placeholder="Enter a word (e.g., algorithm, democracy, pandemic)" />
+                        <input type="text" id="etymo-input" placeholder="Enter a word (e.g., algorithm, democracy, pandemic)" maxlength="200" minlength="2" />
                         <button id="etymo-button">Trace Etymology</button>
                     </div>
                     <div class="examples">

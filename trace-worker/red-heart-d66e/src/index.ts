@@ -11,301 +11,124 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
-// Define Env interface if you have bindings in wrangler.toml (like ANTHROPIC_API_KEY as a secret)
+// Define Env interface for worker bindings
 interface Env {
 	ANTHROPIC_API_KEY: string;
-	// If you were using Cloudflare AI bindings for Anthropic:
-	// AI: any;
+	RATE_LIMIT: KVNamespace;
+	TURNSTILE_SECRET?: string;
 }
 
-// ============================================================================
-// REQUEST DEDUPLICATION
-// Track in-flight requests to prevent redundant API calls
-// ============================================================================
-interface InFlightRequest {
-	promise: Promise<Response>;
-	subscribers: number;
-	startTime: number;
-}
+// Rate limit thresholds
+const RATE_LIMIT_FREE = 20;      // Requests/hour before captcha required
+const RATE_LIMIT_CAPTCHA = 50;   // Requests/hour before blocked entirely
 
-const inFlightRequests = new Map<string, InFlightRequest>();
-
-function getRequestKey(endpoint: string, body: string): string {
-	// Normalize the body for consistent keys
-	const normalizedBody = body.trim().toLowerCase();
-	return `${endpoint}:${normalizedBody}`;
-}
-
-function cleanupStaleRequests(): void {
-	const now = Date.now();
-	const MAX_AGE_MS = 60000; // 1 minute max for any request
-	for (const [key, req] of inFlightRequests.entries()) {
-		if (now - req.startTime > MAX_AGE_MS) {
-			inFlightRequests.delete(key);
-		}
+// Verify Cloudflare Turnstile token
+async function verifyTurnstile(token: string, secret: string): Promise<boolean> {
+	try {
+		const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(token)}`
+		});
+		const data = await res.json() as { success: boolean };
+		return data.success === true;
+	} catch {
+		return false;
 	}
 }
 
-// ============================================================================
-// RATE LIMITING
-// Sliding window rate limiter per IP
-// ============================================================================
-interface RateLimitEntry {
-	requests: number[];
-	blocked_until?: number;
-}
+// Check rate limit and return response if limited
+async function checkRateLimit(request: Request, env: Env): Promise<Response | null> {
+	// Skip rate limiting if KV not configured
+	if (!env.RATE_LIMIT) return null;
 
-const rateLimitStore = new Map<string, RateLimitEntry>();
+	const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+	const hourBucket = Math.floor(Date.now() / 3600000);
+	const rateKey = `rate:${ip}:${hourBucket}`;
 
-const RATE_LIMIT_CONFIG = {
-	windowMs: 60000,        // 1 minute window
-	maxRequests: 10,        // Max 10 requests per minute per IP
-	blockDurationMs: 60000, // Block for 1 minute if exceeded
-};
+	const countStr = await env.RATE_LIMIT.get(rateKey);
+	const count = parseInt(countStr || '0', 10);
 
-function getRateLimitKey(request: Request): string {
-	// Use CF-Connecting-IP header (Cloudflare provides this)
-	const ip = request.headers.get('CF-Connecting-IP') ||
-	           request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
-	           'unknown';
-	return `rate:${ip}`;
-}
-
-function checkRateLimit(request: Request): { allowed: boolean; retryAfter?: number } {
-	const key = getRateLimitKey(request);
-	const now = Date.now();
-
-	let entry = rateLimitStore.get(key);
-
-	// Check if currently blocked
-	if (entry?.blocked_until && now < entry.blocked_until) {
-		return {
-			allowed: false,
-			retryAfter: Math.ceil((entry.blocked_until - now) / 1000)
-		};
-	}
-
-	// Initialize or clean up entry
-	if (!entry) {
-		entry = { requests: [] };
-		rateLimitStore.set(key, entry);
-	}
-
-	// Remove requests outside the window
-	entry.requests = entry.requests.filter(t => now - t < RATE_LIMIT_CONFIG.windowMs);
-	entry.blocked_until = undefined;
-
-	// Check if over limit
-	if (entry.requests.length >= RATE_LIMIT_CONFIG.maxRequests) {
-		entry.blocked_until = now + RATE_LIMIT_CONFIG.blockDurationMs;
-		return {
-			allowed: false,
-			retryAfter: Math.ceil(RATE_LIMIT_CONFIG.blockDurationMs / 1000)
-		};
-	}
-
-	// Record this request
-	entry.requests.push(now);
-	return { allowed: true };
-}
-
-function cleanupRateLimitStore(): void {
-	const now = Date.now();
-	for (const [key, entry] of rateLimitStore.entries()) {
-		// Remove entries with no recent requests and not blocked
-		const hasRecentRequests = entry.requests.some(t => now - t < RATE_LIMIT_CONFIG.windowMs);
-		const isBlocked = entry.blocked_until && now < entry.blocked_until;
-		if (!hasRecentRequests && !isBlocked) {
-			rateLimitStore.delete(key);
-		}
-	}
-}
-
-// ============================================================================
-// XML PARSING WITH ERROR BOUNDARIES
-// Structured error recovery for streaming XML parsing
-// ============================================================================
-interface ParseError {
-	type: 'malformed_xml' | 'missing_field' | 'invalid_value';
-	context: string;
-	recoverable: boolean;
-	partialData?: Record<string, string>;
-}
-
-interface ParseResult<T> {
-	success: boolean;
-	data?: T;
-	error?: ParseError;
-}
-
-interface GenealogyItem {
-	title: string;
-	year: string;
-	url: string;
-	explanation: string;
-}
-
-function parseGenealogyItem(itemXml: string): ParseResult<GenealogyItem> {
-	const errors: string[] = [];
-	const partialData: Record<string, string> = {};
-
-	// Extract each field with error tracking
-	const titleMatch = itemXml.match(/<title>(.*?)<\/title>/s);
-	const yearMatch = itemXml.match(/<year>(.*?)<\/year>/s);
-	const urlMatch = itemXml.match(/<url>(.*?)<\/url>/s);
-	const explanationMatch = itemXml.match(/<explanation>([\s\S]*?)<\/explanation>/);
-
-	if (titleMatch) partialData.title = titleMatch[1].trim();
-	else errors.push('title');
-
-	if (yearMatch) partialData.year = yearMatch[1].trim();
-	else errors.push('year');
-
-	if (urlMatch) partialData.url = urlMatch[1].trim();
-	else errors.push('url');
-
-	if (explanationMatch) partialData.explanation = explanationMatch[1].trim();
-	else errors.push('explanation');
-
-	// Check for minimum viable item (title + explanation)
-	if (partialData.title && partialData.explanation) {
-		// We can recover with defaults for missing fields
-		return {
-			success: true,
-			data: {
-				title: partialData.title,
-				year: partialData.year || 'Unknown',
-				url: partialData.url || '',
-				explanation: partialData.explanation,
+	// Blocked tier: too many requests
+	if (count >= RATE_LIMIT_CAPTCHA) {
+		return new Response(JSON.stringify({
+			error: true,
+			code: 'BLOCKED',
+			message: 'Rate limit exceeded. Please try again later.'
+		}), {
+			status: 429,
+			headers: {
+				'Content-Type': 'application/json',
+				'Access-Control-Allow-Origin': '*',
+				'Retry-After': '3600'
 			}
-		};
+		});
 	}
 
-	return {
-		success: false,
-		error: {
-			type: 'missing_field',
-			context: `Missing required fields: ${errors.join(', ')}`,
-			recoverable: false,
-			partialData
+	// Captcha tier: require verification
+	if (count >= RATE_LIMIT_FREE) {
+		const turnstileToken = request.headers.get('X-Turnstile-Token');
+
+		// No token provided - tell client to show captcha
+		if (!turnstileToken) {
+			return new Response(JSON.stringify({
+				error: true,
+				code: 'CAPTCHA_REQUIRED',
+				message: 'Please complete the captcha to continue.'
+			}), {
+				status: 429,
+				headers: {
+					'Content-Type': 'application/json',
+					'Access-Control-Allow-Origin': '*'
+				}
+			});
 		}
-	};
-}
 
-interface EtymologyItem {
-	category: string;
-	language: string;
-	form: string;
-	dateOrCentury: string;
-	gloss: string;
-	essence: string;
-	crucial: boolean;
-	link: string;
-	confidence: string;
-	note: string;
-}
-
-function parseEtymologyItem(xml: string): ParseResult<EtymologyItem> {
-	const get = (tag: string): string => {
-		const match = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)<\/${tag}>`));
-		return match ? match[1].trim() : '';
-	};
-
-	const category = get('category') || 'root';
-	const language = get('language');
-	const form = get('form');
-	const gloss = get('gloss');
-
-	// Minimum viable: need at least language OR form OR gloss
-	if (!language && !form && !gloss) {
-		return {
-			success: false,
-			error: {
-				type: 'missing_field',
-				context: 'Etymology item has no language, form, or gloss',
-				recoverable: false,
-				partialData: { category }
+		// Verify the token
+		if (env.TURNSTILE_SECRET) {
+			const valid = await verifyTurnstile(turnstileToken, env.TURNSTILE_SECRET);
+			if (!valid) {
+				return new Response(JSON.stringify({
+					error: true,
+					code: 'CAPTCHA_INVALID',
+					message: 'Captcha verification failed. Please try again.'
+				}), {
+					status: 429,
+					headers: {
+						'Content-Type': 'application/json',
+						'Access-Control-Allow-Origin': '*'
+					}
+				});
 			}
-		};
+		}
 	}
 
-	const crucialValue = get('crucial').toLowerCase();
+	// Increment counter
+	await env.RATE_LIMIT.put(rateKey, String(count + 1), { expirationTtl: 3600 });
 
-	return {
-		success: true,
-		data: {
-			category,
-			language,
-			form,
-			dateOrCentury: get('dateOrCentury'),
-			gloss,
-			essence: get('essence'),
-			crucial: crucialValue === 'yes' || crucialValue === 'true',
-			link: get('link'),
-			confidence: get('confidence') || 'medium',
-			note: get('note')
-		}
-	};
+	return null; // No rate limit hit
 }
 
-// Track parsing errors for reporting
-interface ParsingStats {
-	totalAttempted: number;
-	successfulParsed: number;
-	recoveredPartial: number;
-	failed: number;
-	errors: ParseError[];
-}
-
-function createParsingStats(): ParsingStats {
-	return {
-		totalAttempted: 0,
-		successfulParsed: 0,
-		recoveredPartial: 0,
-		failed: 0,
-		errors: []
-	};
-}
-
-// ============================================================================
-// MAIN WORKER
-// ============================================================================
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		const url = new URL(request.url);
 
-		// CORS pre-flight for /trace, /stream, /expand, and /reinterpret
+		// CORS pre-flight for /trace, /stream, /expand, /reinterpret, and /etymology
 		if ((url.pathname === '/trace' || url.pathname === '/stream' || url.pathname === '/expand' || url.pathname === '/reinterpret' || url.pathname === '/etymology') && request.method === 'OPTIONS') {
 			return new Response(null, {
 				headers: {
 					'Access-Control-Allow-Origin': '*',
 					'Access-Control-Allow-Methods': 'POST, OPTIONS',
-					'Access-Control-Allow-Headers': 'Content-Type',
+					'Access-Control-Allow-Headers': 'Content-Type, X-Turnstile-Token',
 				},
 			});
 		}
 
 		// Streaming endpoint
 		if (url.pathname === '/stream' && request.method === 'POST') {
-			// Periodic cleanup
-			cleanupStaleRequests();
-			cleanupRateLimitStore();
-
-			// Rate limiting check
-			const rateCheck = checkRateLimit(request);
-			if (!rateCheck.allowed) {
-				return new Response(JSON.stringify({
-					error: 'Rate limit exceeded',
-					retryAfter: rateCheck.retryAfter
-				}), {
-					status: 429,
-					headers: {
-						'Content-Type': 'application/json',
-						'Access-Control-Allow-Origin': '*',
-						'Retry-After': String(rateCheck.retryAfter || 60)
-					},
-				});
-			}
+			// Check rate limit
+			const rateLimitResponse = await checkRateLimit(request, env);
+			if (rateLimitResponse) return rateLimitResponse;
 
 			try {
 				const query = await request.text();
@@ -316,21 +139,9 @@ export default {
 					});
 				}
 
-				// Request deduplication check
-				const requestKey = getRequestKey('/stream', query);
-				const existingRequest = inFlightRequests.get(requestKey);
-				if (existingRequest) {
-					// Return existing in-flight request
-					existingRequest.subscribers++;
-					console.log(`[DEDUP] Reusing in-flight request for: ${requestKey.slice(0, 50)}... (${existingRequest.subscribers} subscribers)`);
-					return existingRequest.promise;
-				}
-
 				// Create a streaming response
-				const responsePromise = (async () => {
 				const stream = new ReadableStream({
 					async start(controller) {
-						const parsingStats = createParsingStats();
 						try {
 							// Send initial status
 							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Querying Wikipedia"}\n\n`));
@@ -472,30 +283,27 @@ Format your response using XML tags for easy parsing:
 												if (data.type === 'content_block_delta' && data.delta?.text) {
 													accumulator += data.delta.text;
 													
-													// Parse XML-formatted genealogy items with error boundaries
+													// Parse XML-formatted genealogy items
 													const itemMatches = [...accumulator.matchAll(/<item>([\s\S]*?)<\/item>/g)];
 													for (const itemMatch of itemMatches) {
 														const itemXml = itemMatch[1];
-														parsingStats.totalAttempted++;
-
-														// Use structured parser with error recovery
-														const parseResult = parseGenealogyItem(itemXml);
-
-														if (parseResult.success && parseResult.data) {
-															const { title, year, url, explanation } = parseResult.data;
+														const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
+														const yearMatch = itemXml.match(/<year>(.*?)<\/year>/);
+														const urlMatch = itemXml.match(/<url>(.*?)<\/url>/);
+														const explanationMatch = itemXml.match(/<explanation>([\s\S]*?)<\/explanation>/);
+														
+														if (titleMatch && yearMatch && urlMatch && explanationMatch) {
+															const title = titleMatch[1].trim();
+															const year = yearMatch[1].trim();
+															const url = urlMatch[1].trim();
+															const explanation = explanationMatch[1].trim();
 															const itemKey = `${title}_${year}`;
-
-															if (!processedItems.has(itemKey) &&
-																title.length > 3 &&
+															
+															if (!processedItems.has(itemKey) && 
+																title.length > 3 && 
 																explanation.length > 5) {
 																processedItems.add(itemKey);
-																parsingStats.successfulParsed++;
-
-																// Check if this was a recovered partial item
-																if (!itemXml.includes('<year>') || !itemXml.includes('<url>')) {
-																	parsingStats.recoveredPartial++;
-																}
-
+																
 																const item = {
 																	type: "genealogy_item",
 																	title: title,
@@ -503,21 +311,8 @@ Format your response using XML tags for easy parsing:
 																	url: url,
 																	claim: explanation
 																};
-
+																
 																controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(item)}\n\n`));
-															}
-														} else if (parseResult.error) {
-															parsingStats.failed++;
-															parsingStats.errors.push(parseResult.error);
-															console.warn('[PARSE] Failed to parse item:', parseResult.error.context);
-
-															// Send error event to client for transparency
-															if (parsingStats.errors.length <= 3) { // Limit error events
-																controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-																	type: "parse_warning",
-																	message: parseResult.error.context,
-																	partialData: parseResult.error.partialData
-																})}\n\n`));
 															}
 														}
 													}
@@ -588,6 +383,10 @@ Format your response using XML tags for easy parsing:
 		}
 
 		if (url.pathname === '/trace' && request.method === 'POST') {
+			// Check rate limit
+			const rateLimitResponse = await checkRateLimit(request, env);
+			if (rateLimitResponse) return rateLimitResponse;
+
 			// Keep existing /trace endpoint for backward compatibility
 			try {
 				const startTime = Date.now();
@@ -733,244 +532,12 @@ Open Questions:
 			}
 		}
 
-		// New /etymology streaming endpoint
-		if (url.pathname === '/etymology' && request.method === 'POST') {
-			try {
-				const term = await request.text();
-				if (!term) {
-					return new Response(JSON.stringify({ error: 'Missing word' }), {
-						status: 400,
-						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-					});
-				}
-
-				const stream = new ReadableStream({
-					async start(controller) {
-						const enc = new TextEncoder();
-						function send(obj: any) {
-							controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
-						}
-
-						try {
-							send({ type: 'status', message: 'Querying Wiktionary' });
-							// 1) Discover sections in Wiktionary page
-							const sectionsUrl = `https://en.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(term)}&prop=sections&format=json&origin=*`;
-							let etymSections: number[] = [];
-							try {
-								const secRes = await fetch(sectionsUrl, { headers: { 'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)' } });
-								const secJson = await secRes.json() as any;
-								const sections = secJson?.parse?.sections ?? [];
-								for (const s of sections) {
-									const line = (s?.line || '').toLowerCase();
-									if (line.includes('etymology')) {
-										etymSections.push(parseInt(s.index, 10));
-									}
-								}
-							} catch {}
-
-							send({ type: 'status', message: 'Parsing etymology section(s)' });
-							// 2) Pull wikitext for each etymology section
-							let rawNotes: string[] = [];
-							if (etymSections.length === 0) {
-								// Try section=0 (whole page) as fallback
-								const pageUrl = `https://en.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(term)}&prop=wikitext&format=json&origin=*`;
-								try {
-									const pageRes = await fetch(pageUrl, { headers: { 'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)' } });
-									const pageJson = await pageRes.json() as any;
-									const wikitext = pageJson?.parse?.wikitext?.['*'] || '';
-									rawNotes.push(wikitext);
-								} catch {}
-							} else {
-								for (const idx of etymSections) {
-									const contentUrl = `https://en.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(term)}&section=${idx}&prop=wikitext&format=json&origin=*`;
-									try {
-										const cRes = await fetch(contentUrl, { headers: { 'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)' } });
-										const cJson = await cRes.json() as any;
-										const wikitext = cJson?.parse?.wikitext?.['*'] || '';
-										rawNotes.push(wikitext);
-									} catch {}
-								}
-							}
-
-							// 3) Wikipedia for context and dates
-							send({ type: 'status', message: 'Querying Wikipedia' });
-							let wikiTitles: string[] = [];
-							try {
-								const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
-									encodeURIComponent(term) + '&format=json&origin=*&srlimit=2';
-								const wikiRes = await fetch(wikiURL, { headers: { 'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)' } });
-								const wikiText = await wikiRes.text();
-								let wikiJson: any = { query: { search: [] } };
-								try { wikiJson = JSON.parse(wikiText); } catch {}
-								wikiTitles = (wikiJson?.query?.search ?? []).slice(0, 2).map((i: any) => i.title);
-							} catch {}
-
-							// 4) Ask LLM to structure the wikitext into etymology items
-							send({ type: 'status', message: 'Calling Claude' });
-							const anthropicApiKey = env.ANTHROPIC_API_KEY;
-							if (!anthropicApiKey) {
-								send({ type: 'error', message: 'Anthropic API key not set' });
-								controller.close();
-								return;
-							}
-
-							const prompt = `You are an expert historical linguist. Construct a concise, source-grounded etymology for "${term}" that highlights the few crucial meaning shifts over time (clear, non-mystical, plain language).
-
-Raw Wiktionary wikitext (may include multiple etymology sections):
-${rawNotes.slice(0, 2).map((txt, i) => `--- WIKITEXT ${i + 1} START ---\n${txt.slice(0, 6000)}\n--- WIKITEXT ${i + 1} END ---`).join('\n\n')}
-
-Related Wikipedia pages: ${wikiTitles.join(', ')}
-
-STREAMABLE XML requirements:
-1) Provide a morphology breakdown first:
-<morphology>
-  <part><form>prefix/root/suffix form</form><gloss>plain-language gloss</gloss></part>
-  <part><form>...</form><gloss>...</gloss></part>
-</morphology>
-
-2) Then stream 4–6 <item> entries prioritizing meaning "shifts" over minor borrowing steps. Use:
-<item>
-  <category>one of: root, borrow, shift, cognate, quote</category>
-  <language>language or proto-language</language>
-  <form>attested form (use * for reconstructed)</form>
-  <dateOrCentury>YYYY or e.g., "12th c."</dateOrCentury>
-  <gloss>what changed in sense (be concrete)</gloss>
-  <essence>1–2 sentences: what changed in meaning and why it matters (plain English)</essence>
-  <crucial>yes or no (mark only epochal sense-changes as yes)</crucial>
-  <link>Wiktionary/Wikipedia/authoritative source URL</link>
-  <confidence>low|medium|high</confidence>
-  <note>optional brief note</note>
-</item>
-
-Favor a small number of crucial shifts. Prefer Wiktionary/Wikipedia URLs. Envelope all in <etymology>...</etymology>.`;
-
-							const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
-							const llmRes = await fetch(anthropicApiUrl, {
-								method: 'POST',
-								headers: {
-									'Content-Type': 'application/json',
-									'x-api-key': anthropicApiKey,
-									'anthropic-version': '2023-06-01',
-								},
-								body: JSON.stringify({
-									model: 'claude-opus-4-5-20251101',
-									messages: [{ role: 'user', content: prompt }],
-									max_tokens: 1500,
-									stream: true
-								}),
-							});
-
-							if (!llmRes.ok) {
-								send({ type: 'error', message: `AI service error: ${llmRes.status}` });
-								controller.close();
-								return;
-							}
-
-							const reader = llmRes.body!.getReader();
-							const decoder = new TextDecoder();
-							let buffer = '';
-							let acc = '';
-							let morphologySent = false;
-							const sentItems = new Set<string>();
-
-							try {
-                                while (true) {
-                                    const { done, value } = await reader.read();
-                                    if (done) break;
-                                    buffer += decoder.decode(value, { stream: true });
-                                    const lines = buffer.split('\n');
-                                    buffer = lines.pop() || '';
-                                    for (const line of lines) {
-                                        if (line.startsWith('data: ')) {
-                                            try {
-                                                const data = JSON.parse(line.slice(6));
-                                                if (data.type === 'content_block_delta' && data.delta?.text) {
-                                                    acc += data.delta.text;
-                                                    // Parse XML items progressively
-                                                    // Morphology block (send once when available)
-                                                    if (!morphologySent) {
-                                                        const morphMatch = acc.match(/<morphology>([\s\S]*?)<\/morphology>/);
-                                                        if (morphMatch) {
-                                                            const morphXml = morphMatch[1];
-                                                            const partMatches = [...morphXml.matchAll(/<part>([\s\S]*?)<\/part>/g)];
-                                                            const parts: Array<{form: string; gloss: string}> = [];
-                                                            for (const pm of partMatches) {
-                                                                const partXml = pm[1];
-                                                                const f = (partXml.match(/<form>([\s\S]*?)<\/form>/) || [,''])[1].trim();
-                                                                const g = (partXml.match(/<gloss>([\s\S]*?)<\/gloss>/) || [,''])[1].trim();
-                                                                if (f) parts.push({ form: f, gloss: g });
-                                                            }
-                                                            if (parts.length > 0) {
-                                                                send({ type: 'morphology', parts });
-                                                                morphologySent = true;
-                                                            }
-                                                        }
-                                                    }
-
-                                                    const itemMatches = [...acc.matchAll(/<item>([\s\S]*?)<\/item>/g)];
-                                                    for (const m of itemMatches) {
-                                                        const xml = m[1];
-                                                        const get = (tag: string) => {
-                                                            const match = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)<\/${tag}>`));
-                                                            return match ? match[1].trim() : '';
-                                                        };
-                                                        const item = {
-                                                            type: 'etymology_item',
-                                                            category: get('category') || 'root',
-                                                            language: get('language') || '',
-                                                            form: get('form') || '',
-                                                            dateOrCentury: get('dateOrCentury') || '',
-                                                            gloss: get('gloss') || '',
-                                                            essence: get('essence') || '',
-                                                            crucial: (() => { const c = get('crucial').toLowerCase(); return c === 'yes' || c === 'true'; })(),
-                                                            link: get('link') || '',
-                                                            confidence: get('confidence') || 'medium',
-                                                            note: get('note') || ''
-                                                        } as any;
-                                                        const key = `${item.category}|${item.language}|${item.form}|${item.dateOrCentury}`;
-                                                        if (!sentItems.has(key) && (item.language || item.form || item.gloss)) {
-                                                            sentItems.add(key);
-                                                            send(item);
-                                                        }
-                                                    }
-                                                }
-                                            } catch {}
-                                        }
-                                    }
-                                }
-							} finally {
-								reader.releaseLock();
-							}
-
-							send({ type: 'complete' });
-							controller.close();
-
-						} catch (err: any) {
-							send({ type: 'error', message: String(err?.message || 'Unknown error') });
-							controller.close();
-						}
-					}
-				});
-
-				return new Response(stream, {
-					headers: {
-						'Content-Type': 'text/event-stream',
-						'Cache-Control': 'no-cache',
-						'Connection': 'keep-alive',
-						'Access-Control-Allow-Origin': '*',
-					},
-				});
-
-			} catch (e: any) {
-				return new Response(JSON.stringify({ error: 'Etymology processing error', details: e.message }), {
-					status: 500,
-					headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-				});
-			}
-		}
-
 		// New /expand endpoint for detailed analysis of genealogy items
 		if (url.pathname === '/expand' && request.method === 'POST') {
+			// Check rate limit
+			const rateLimitResponse = await checkRateLimit(request, env);
+			if (rateLimitResponse) return rateLimitResponse;
+
 			try {
 				const requestData = await request.json() as { title?: string; year?: string; claim?: string };
 				const { title, year, claim } = requestData;
@@ -1078,6 +645,10 @@ Your final output should be just the explanation, without any additional comment
 
 		// New /reinterpret endpoint for alternative genealogy
 		if (url.pathname === '/reinterpret' && request.method === 'POST') {
+			// Check rate limit
+			const rateLimitResponse = await checkRateLimit(request, env);
+			if (rateLimitResponse) return rateLimitResponse;
+
 			try {
 				const requestData = await request.json() as { 
 					query: string; 
@@ -1356,12 +927,183 @@ Format your response using XML tags for easy parsing:
 			}
 		}
 
+		// Etymology endpoint
+		if (url.pathname === '/etymology' && request.method === 'POST') {
+			// Check rate limit
+			const rateLimitResponse = await checkRateLimit(request, env);
+			if (rateLimitResponse) return rateLimitResponse;
+
+			try {
+				const word = await request.text();
+				if (!word) {
+					return new Response(JSON.stringify({ error: 'Missing word' }), {
+						status: 400,
+						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+					});
+				}
+
+				const stream = new ReadableStream({
+					async start(controller) {
+						try {
+							// Send initial status
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Fetching Wiktionary entry"}\n\n`));
+
+							// Fetch Wiktionary
+							const wiktionaryUrl = `https://en.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(word)}&prop=wikitext&format=json&origin=*`;
+							let wikitext = '';
+							try {
+								const wiktRes = await fetch(wiktionaryUrl, {
+									headers: { 'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)' }
+								});
+								const wiktJson = await wiktRes.json() as any;
+								wikitext = wiktJson?.parse?.wikitext?.['*'] || '';
+							} catch (e) {
+								console.error('Wiktionary fetch error:', e);
+							}
+
+							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Analyzing etymology with Claude"}\n\n`));
+
+							// Call Claude for etymology analysis
+							const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/json',
+									'x-api-key': env.ANTHROPIC_API_KEY,
+									'anthropic-version': '2023-06-01',
+								},
+								body: JSON.stringify({
+									model: 'claude-opus-4-5-20251101',
+									max_tokens: 4096,
+									stream: true,
+									messages: [{
+										role: 'user',
+										content: `Analyze the etymology of the word "${word}".
+
+${wikitext ? `Here is the Wiktionary entry:\n\n${wikitext.substring(0, 8000)}` : 'No Wiktionary entry found. Use your knowledge.'}
+
+Respond with a JSON object containing:
+1. "morphology": array of {form, gloss} for each morpheme (prefix, root, suffix)
+2. "items": array of etymology stages, each with:
+   - "form": the word form at this stage
+   - "language": the source language
+   - "dateOrCentury": approximate date/century
+   - "gloss": meaning at this stage
+   - "essence": brief explanation of semantic significance
+   - "category": one of "root", "borrow", "shift", "cognate", "quote"
+   - "crucial": boolean, true if this is a key semantic shift
+   - "confidence": "high", "medium", or "low"
+   - "link": Wiktionary URL if available
+   - "note": optional additional context
+
+Order items chronologically from oldest to newest. Focus on semantic shifts and conceptual evolution.
+
+Respond ONLY with valid JSON, no other text.`
+									}],
+								}),
+							});
+
+							if (!claudeRes.ok) {
+								const errText = await claudeRes.text();
+								throw new Error(`Claude API error: ${claudeRes.status} - ${errText}`);
+							}
+
+							const reader = claudeRes.body?.getReader();
+							if (!reader) throw new Error('No response body');
+
+							let fullText = '';
+							const decoder = new TextDecoder();
+							let buffer = '';
+
+							while (true) {
+								const { done, value } = await reader.read();
+								if (done) break;
+
+								buffer += decoder.decode(value, { stream: true });
+								const lines = buffer.split('\n');
+								buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+								for (const line of lines) {
+									if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+										try {
+											const data = JSON.parse(line.slice(6));
+											if (data.type === 'content_block_delta' && data.delta?.text) {
+												fullText += data.delta.text;
+											}
+										} catch {}
+									}
+								}
+							}
+
+							// Parse the complete JSON response
+							try {
+								// Extract JSON from response (handle markdown code blocks)
+								let jsonStr = fullText;
+								const jsonMatch = fullText.match(/```(?:json)?\s*([\s\S]*?)```/);
+								if (jsonMatch) {
+									jsonStr = jsonMatch[1];
+								}
+
+								const result = JSON.parse(jsonStr.trim());
+
+								// Send morphology
+								if (result.morphology && result.morphology.length > 0) {
+									controller.enqueue(new TextEncoder().encode(
+										`data: ${JSON.stringify({ type: 'morphology', parts: result.morphology })}\n\n`
+									));
+								}
+
+								// Send etymology items one by one
+								if (result.items && Array.isArray(result.items)) {
+									for (const item of result.items) {
+										controller.enqueue(new TextEncoder().encode(
+											`data: ${JSON.stringify({ type: 'etymology_item', ...item })}\n\n`
+										));
+									}
+								}
+
+								controller.enqueue(new TextEncoder().encode(`data: {"type":"complete"}\n\n`));
+							} catch (parseErr) {
+								console.error('JSON parse error:', parseErr, 'Raw:', fullText.substring(0, 500));
+								controller.enqueue(new TextEncoder().encode(
+									`data: ${JSON.stringify({ type: 'error', message: 'Failed to parse etymology response' })}\n\n`
+								));
+							}
+
+							controller.close();
+						} catch (err: any) {
+							console.error('Etymology stream error:', err);
+							controller.enqueue(new TextEncoder().encode(
+								`data: ${JSON.stringify({ type: 'error', message: err.message || 'Unknown error' })}\n\n`
+							));
+							controller.close();
+						}
+					}
+				});
+
+				return new Response(stream, {
+					headers: {
+						'Content-Type': 'text/event-stream',
+						'Cache-Control': 'no-cache',
+						'Connection': 'keep-alive',
+						'Access-Control-Allow-Origin': '*',
+					},
+				});
+
+			} catch (e: any) {
+				console.error('Worker error during /etymology:', e);
+				return new Response(JSON.stringify({ error: 'Etymology processing error', details: e.message }), {
+					status: 500,
+					headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+				});
+			}
+		}
+
 		if (url.pathname === '/') {
-			return new Response('Genealogy AI Trace Worker is running. Use the /trace endpoint with POST for full response, /stream for streaming, /expand for detailed analysis, or /reinterpret for alternative genealogies.', {
+			return new Response('Genealogy AI Trace Worker is running. Use the /trace endpoint with POST for full response, /stream for streaming, /expand for detailed analysis, /reinterpret for alternative genealogies, or /etymology for word etymology.', {
 				headers: { 'Content-Type': 'text/plain' },
 			});
 		}
 
-		return new Response('Not found. Use /trace with POST, /stream with POST, /expand with POST, /reinterpret with POST, or visit the root /.', { status: 404 });
+		return new Response('Not found. Use /trace, /stream, /expand, /reinterpret, or /etymology with POST, or visit the root /.', { status: 404 });
 	},
 } satisfies ExportedHandler<Env>;

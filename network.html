@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network - Concept Tracer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon16.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="icons/icon48.png">
+    <link rel="icon" type="image/png" sizes="128x128" href="icons/icon128.png">
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="container network-container">
+        <header>
+            <div class="logo-section">
+                <a href="index.html" class="logo-link">
+                    <img src="icons/icon128.png" alt="Concept Tracer" class="main-logo">
+                    <h1>Concept Tracer</h1>
+                </a>
+            </div>
+            <nav>
+                <a href="about.html">About</a>
+                <a href="try.html">Trace Online</a>
+                <a href="etymology.html">Etymology</a>
+                <a href="network.html" class="active">Network</a>
+                <a href="index.html#download">Download</a>
+            </nav>
+        </header>
+
+        <main class="network-main">
+            <!-- Left sidebar: Controls -->
+            <aside class="network-controls">
+                <div class="control-section">
+                    <h3>Add Concept</h3>
+                    <form id="add-concept-form" class="add-concept-form">
+                        <input type="text" id="concept-input" placeholder="Enter a concept..." />
+                        <button type="submit">Add</button>
+                    </form>
+                </div>
+
+                <div class="control-section">
+                    <h3>Active Concepts</h3>
+                    <ul id="concept-list" class="concept-list">
+                        <li class="concept-list-empty">No concepts traced yet</li>
+                    </ul>
+                </div>
+
+                <div class="control-section">
+                    <h3>Legend</h3>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <svg width="30" height="10">
+                                <line x1="0" y1="5" x2="30" y2="5" stroke="#666" stroke-width="1.5"></line>
+                            </svg>
+                            <span>temporal</span>
+                        </div>
+                        <div class="legend-item">
+                            <svg width="30" height="10">
+                                <line x1="0" y1="5" x2="30" y2="5" stroke="#666" stroke-width="1.5" stroke-dasharray="4 2"></line>
+                            </svg>
+                            <span>cross-concept</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-section control-actions">
+                    <button id="clear-btn" class="action-btn">Clear All</button>
+                    <button id="export-btn" class="action-btn">Export PNG</button>
+                </div>
+            </aside>
+
+            <!-- Center: Network Canvas -->
+            <section class="network-canvas-container">
+                <div id="network-canvas" class="network-canvas">
+                    <!-- D3 will render SVG here -->
+                </div>
+                <div id="network-empty" class="network-empty">
+                    <p>Add a concept to begin exploring</p>
+                    <p class="hint">Try: "natural selection", "machine learning", "democracy"</p>
+                </div>
+                <div id="network-loading" class="network-loading" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p>Tracing genealogy...</p>
+                </div>
+            </section>
+
+            <!-- Right sidebar: Node Detail -->
+            <aside id="node-detail" class="node-detail-panel">
+                <div class="detail-placeholder">
+                    <p>Click a node to see details</p>
+                </div>
+                <div id="detail-content" class="detail-content" style="display: none;">
+                    <h3 id="detail-title"></h3>
+                    <p id="detail-year" class="detail-year"></p>
+                    <p id="detail-claim" class="detail-claim"></p>
+                    <p id="detail-concept" class="detail-concept"></p>
+                    <div class="detail-actions">
+                        <a id="detail-source" href="#" target="_blank" class="action-btn">Source</a>
+                        <button id="detail-trace" class="action-btn">Trace This</button>
+                        <button id="detail-pin" class="action-btn">Pin</button>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <footer>
+            <div class="footer-content">
+                <div class="footer-text">
+                    <p>"There are no facts, only interpretations." <em>-- Nietzsche</em></p>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/simonkral1/genealogy-tracer">GitHub</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="network.js"></script>
+</body>
+</html>
