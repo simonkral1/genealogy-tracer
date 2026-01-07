@@ -14,16 +14,19 @@
 // Define Env interface for worker bindings
 interface Env {
 	ANTHROPIC_API_KEY: string;
+	HYPERBOLIC_API_KEY?: string;
 	RATE_LIMIT: KVNamespace;
 	TURNSTILE_SECRET?: string;
 }
 
-// Allowed models for user selection
+import { getWikidataContext, type WikidataWork } from './wikidata';
+
+// Allowed models for user selection (Anthropic defaults) – Hyperbolic handled by name heuristics
 const ALLOWED_MODELS = ['claude-sonnet-4', 'claude-haiku-4-5', 'claude-opus-4-5-20251101'];
-const DEFAULT_MODEL = 'claude-sonnet-4';
+const DEFAULT_MODEL = 'claude-opus-4-5-20251101';
 
 function getValidModel(requestModel: string | undefined): string {
-	if (requestModel && ALLOWED_MODELS.includes(requestModel)) {
+	if (requestModel && (ALLOWED_MODELS.includes(requestModel) || requestModel.toLowerCase().includes('qwen') || requestModel.toLowerCase().includes('kimi'))) {
 		return requestModel;
 	}
 	return DEFAULT_MODEL;
@@ -120,6 +123,230 @@ async function checkRateLimit(request: Request, env: Env): Promise<Response | nu
 	return null; // No rate limit hit
 }
 
+interface GenealogyItem {
+	title: string;
+	year: string;
+	url: string;
+	claim: string;
+}
+
+function isHyperbolicModel(model: string): boolean {
+	const lowered = model.toLowerCase();
+	return lowered.includes('qwen') || lowered.includes('kimi');
+}
+
+async function fetchWikipediaTitles(query: string): Promise<string[]> {
+	const wikiURL = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=3`;
+
+	try {
+		const wikiRes = await fetch(wikiURL, {
+			headers: {
+				'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)'
+			}
+		});
+		const wikiJson = await wikiRes.json() as any;
+		return (wikiJson?.query?.search ?? []).slice(0, 3).map((i: any) => i.title as string);
+	} catch (err) {
+		console.error('Wikipedia fetch failed', err);
+		return [];
+	}
+}
+
+function buildGenealogyPrompt(query: string, titles: string[], wikidataWorks: WikidataWork[] = []): string {
+	return `You are a brilliant intellectual historian tracing the genealogy of "${query}" with scholarly precision and creative insight.
+
+Construct a five-item genealogy revealing how this concept emerged, transformed, and continues to evolve.
+
+Guidelines:
+1. Focus on works that fundamentally shifted how people understood this concept
+2. Arrange chronologically, showing intellectual evolution and ruptures
+3. Each explanation should reveal what made that work revolutionary for its time
+4. Keep each explanation under 80 words - be concise and impactful
+5. URLs should link to primary sources, key texts, or authoritative encyclopedic entries
+Wikipedia references available: ${titles.join(', ')}
+
+${wikidataWorks.length > 0 ? `
+Structured data from Wikidata (chronologically ordered works about "${query}"):
+${wikidataWorks.slice(0, 10).map((w: WikidataWork) =>
+  `- ${w.title} (${w.year}) by ${w.author}`
+).join('\n')}
+` : ''}
+
+Format your response using XML tags for easy parsing:
+
+<genealogy>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+<item>
+<title>Title of Work</title>
+<year>YYYY</year>
+<url>https://example.com</url>
+<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
+</item>
+
+<questions>
+<question>Fundamental question 1 about ${query}</question>
+<question>Fundamental question 2 about ${query}</question>
+</questions>
+</genealogy>`;
+}
+
+async function callModel(prompt: string, model: string, env: Env): Promise<string> {
+	if (isHyperbolicModel(model)) {
+		if (!env.HYPERBOLIC_API_KEY) {
+			throw new Error('Hyperbolic API key not set');
+		}
+
+		const res = await fetch('https://api.hyperbolic.xyz/v1/chat/completions', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${env.HYPERBOLIC_API_KEY}`,
+			},
+			body: JSON.stringify({
+				model,
+				messages: [{ role: 'user', content: prompt }],
+				max_tokens: 1500,
+				temperature: 0.7,
+			})
+		});
+
+		if (!res.ok) {
+			const errText = await res.text();
+			throw new Error(`Hyperbolic error ${res.status}: ${errText}`);
+		}
+
+		const data = await res.json() as any;
+		const content = data?.choices?.[0]?.message?.content;
+		if (!content) {
+			throw new Error('Hyperbolic response missing content');
+		}
+
+		if (typeof content === 'string') return content;
+		if (Array.isArray(content) && content[0]?.type === 'text') {
+			return content[0].text as string;
+		}
+
+		return JSON.stringify(content);
+	}
+
+	const anthropicApiKey = env.ANTHROPIC_API_KEY;
+	if (!anthropicApiKey) {
+		throw new Error('Anthropic API key not set');
+	}
+
+	const res = await fetch('https://api.anthropic.com/v1/messages', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'x-api-key': anthropicApiKey,
+			'anthropic-version': '2023-06-01',
+		},
+		body: JSON.stringify({
+			model,
+			messages: [{ role: 'user', content: prompt }],
+			max_tokens: 1500,
+		})
+	});
+
+	if (!res.ok) {
+		const errText = await res.text();
+		throw new Error(`Anthropic error ${res.status}: ${errText}`);
+	}
+
+	const data = await res.json() as any;
+	const textBlock = data?.content?.find((block: any) => block.type === 'text');
+	if (textBlock?.text) return textBlock.text as string;
+	if (data?.content?.[0]?.text) return data.content[0].text as string;
+
+	throw new Error('Anthropic response missing text content');
+}
+
+function extractGenealogyContent(text: string): string {
+	const match = text.match(/<genealogy>([\s\S]*?)<\/genealogy>/i);
+	return match ? match[1].trim() : text.trim();
+}
+
+function parseGenealogyText(raw: string): { items: GenealogyItem[]; questions: string[] } {
+	const cleaned = raw.trim();
+	const items: GenealogyItem[] = [];
+	const questions: string[] = [];
+	const seen = new Set<string>();
+
+	const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+	let match: RegExpExecArray | null;
+	while ((match = itemRegex.exec(cleaned)) !== null) {
+		const block = match[1];
+		const title = block.match(/<title>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? '';
+		const year = block.match(/<year>([\s\S]*?)<\/year>/i)?.[1]?.trim() ?? '';
+		const url = block.match(/<url>([\s\S]*?)<\/url>/i)?.[1]?.trim() ?? '';
+		const explanation = block.match(/<explanation>([\s\S]*?)<\/explanation>/i)?.[1]?.trim() ?? '';
+		const key = `${title}-${year}-${url}`;
+		if (title && explanation && !seen.has(key)) {
+			items.push({ title, year, url, claim: explanation });
+			seen.add(key);
+		}
+	}
+
+	if (!items.length) {
+		const lineRegex = /^(.*?)\s*\(([^)]+)\)\s*\[\[(.*?)\]\]\s*[—-]\s*(.+)$/gm;
+		let lineMatch: RegExpExecArray | null;
+		while ((lineMatch = lineRegex.exec(cleaned)) !== null) {
+			const [, title, year, url, claim] = lineMatch;
+			const key = `${title}-${year}-${url}`;
+			if (title.trim() && claim.trim() && !seen.has(key)) {
+				items.push({
+					title: title.trim(),
+					year: year.trim(),
+					url: url.trim(),
+					claim: claim.trim(),
+				});
+				seen.add(key);
+			}
+		}
+	}
+
+	for (const questionMatch of cleaned.matchAll(/<question>([\s\S]*?)<\/question>/gi)) {
+		const text = questionMatch[1].trim();
+		if (text) questions.push(text);
+	}
+
+	if (!questions.length) {
+		const openIdx = cleaned.toLowerCase().indexOf('open questions');
+		if (openIdx !== -1) {
+			const lines = cleaned.slice(openIdx).split('\n').slice(1);
+			for (const line of lines) {
+				const trimmed = line.replace(/^[*-]\s*/, '').trim();
+				if (trimmed) questions.push(trimmed);
+			}
+		}
+	}
+
+	return { items, questions };
+}
+
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		const url = new URL(request.url);
@@ -164,227 +391,73 @@ export default {
 				}
 
 				const model = getValidModel(requestedModel);
+				const providerName = isHyperbolicModel(model) ? 'Hyperbolic' : 'Anthropic';
 
-				// Create a streaming response
 				const stream = new ReadableStream({
 					async start(controller) {
+						const encoder = new TextEncoder();
+						const send = (data: any) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+
 						try {
-							// Send initial status
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Querying Wikipedia"}\n\n`));
+							send({ type: 'status', message: 'Querying knowledge sources' });
 
-							// Wikipedia search
-							const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
-								encodeURIComponent(query) + '&format=json&origin=*&srlimit=3';
-							let titles: string[] = [];
-							try {
-								const wikiRes = await fetch(wikiURL, {
-									headers: {
-										'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)'
-									}
-								});
-								const wikiText = await wikiRes.text();
-								let wikiJson: any = { query: { search: [] } };
-								try {
-									wikiJson = JSON.parse(wikiText);
-								} catch {}
-								titles = (wikiJson?.query?.search ?? []).slice(0, 3).map((i: any) => i.title);
-							} catch (e) {
-								// Fall back silently
-								titles = [];
-							}
-
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Processing genealogy"}\n\n`));
-
-							// Prepare prompt
-							const prompt = `You are a brilliant intellectual historian tracing the genealogy of "${query}" with scholarly precision and creative insight.
-
-Construct a five-item genealogy revealing how this concept emerged, transformed, and continues to evolve.
-
-Guidelines:
-1. Focus on works that fundamentally shifted how people understood this concept
-2. Arrange chronologically, showing intellectual evolution and ruptures
-3. Each explanation should reveal what made that work revolutionary for its time
-4. Keep each explanation under 80 words - be concise and impactful
-5. URLs should link to primary sources, key texts, or authoritative encyclopedic entries
-Wikipedia references available: ${titles.join(", ")}
-
-Format your response using XML tags for easy parsing:
-
-<genealogy>
-<item>
-<title>Title of Work</title>
-<year>YYYY</year>
-<url>https://example.com</url>
-<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
-</item>
-<item>
-<title>Title of Work</title>
-<year>YYYY</year>
-<url>https://example.com</url>
-<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
-</item>
-<item>
-<title>Title of Work</title>
-<year>YYYY</year>
-<url>https://example.com</url>
-<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
-</item>
-<item>
-<title>Title of Work</title>
-<year>YYYY</year>
-<url>https://example.com</url>
-<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
-</item>
-<item>
-<title>Title of Work</title>
-<year>YYYY</year>
-<url>https://example.com</url>
-<explanation>Concise explanation of the paradigm shift or insight (under 80 words)</explanation>
-</item>
-
-<questions>
-<question>Fundamental question 1 about ${query}</question>
-<question>Fundamental question 2 about ${query}</question>
-</questions>
-</genealogy>`;
-
-							// Inform client that we are about to call the language model
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Calling Claude"}\n\n`));
-
-							// Call Anthropic API with streaming
-							const anthropicApiUrl = 'https://api.anthropic.com/v1/messages';
-							const anthropicApiKey = env.ANTHROPIC_API_KEY;
-
-							if (!anthropicApiKey) {
-								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"Anthropic API key not set"}\n\n`));
-								controller.close();
-								return;
-							}
-
-							const llmRes = await fetch(anthropicApiUrl, {
-								method: 'POST',
-								headers: {
-									'Content-Type': 'application/json',
-									'x-api-key': anthropicApiKey,
-									'anthropic-version': '2023-06-01',
-								},
-								body: JSON.stringify({
-									model: model,
-									messages: [{ role: 'user', content: prompt }],
-									max_tokens: 1500,
-									stream: true
-								}),
-							});
-
-							if (!llmRes.ok) {
-								const errorBody = await llmRes.text();
-								console.error('Claude API error:', llmRes.status);
-								controller.enqueue(new TextEncoder().encode(`data: {"type":"error","message":"AI service error: ${llmRes.status}"}\n\n`));
-								controller.close();
-								return;
-							}
-
-							// Process Claude's streaming response
-							const reader = llmRes.body!.getReader();
-							const decoder = new TextDecoder();
-							let buffer = '';
-							let accumulator = '';
-							const processedItems = new Set();
-							const processedQuestions = new Set();
-
-							try {
-								while (true) {
-									const { done, value } = await reader.read();
-									if (done) break;
-
-									buffer += decoder.decode(value, { stream: true });
-									const lines = buffer.split('\n');
-									buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-									for (const line of lines) {
-										if (line.startsWith('data: ')) {
-											try {
-												const data = JSON.parse(line.slice(6));
-												
-												if (data.type === 'content_block_delta' && data.delta?.text) {
-													accumulator += data.delta.text;
-													
-													// Parse XML-formatted genealogy items
-													const itemMatches = [...accumulator.matchAll(/<item>([\s\S]*?)<\/item>/g)];
-													for (const itemMatch of itemMatches) {
-														const itemXml = itemMatch[1];
-														const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
-														const yearMatch = itemXml.match(/<year>(.*?)<\/year>/);
-														const urlMatch = itemXml.match(/<url>(.*?)<\/url>/);
-														const explanationMatch = itemXml.match(/<explanation>([\s\S]*?)<\/explanation>/);
-														
-														if (titleMatch && yearMatch && urlMatch && explanationMatch) {
-															const title = titleMatch[1].trim();
-															const year = yearMatch[1].trim();
-															const url = urlMatch[1].trim();
-															const explanation = explanationMatch[1].trim();
-															const itemKey = `${title}_${year}`;
-															
-															if (!processedItems.has(itemKey) && 
-																title.length > 3 && 
-																explanation.length > 5) {
-																processedItems.add(itemKey);
-																
-																const item = {
-																	type: "genealogy_item",
-																	title: title,
-																	year: year,
-																	url: url,
-																	claim: explanation
-																};
-																
-																controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(item)}\n\n`));
-															}
-														}
-													}
-													
-													// Parse XML-formatted questions
-													const questionMatches = [...accumulator.matchAll(/<question>(.*?)<\/question>/g)];
-													for (const questionMatch of questionMatches) {
-														const questionText = questionMatch[1].trim();
-														
-														if (questionText.length > 30 && 
-															questionText.length < 400 && 
-															!processedQuestions.has(questionText.toLowerCase())) {
-															processedQuestions.add(questionText.toLowerCase());
-															
-															// Send questions section signal first time we find questions
-															if (processedQuestions.size === 1) {
-																controller.enqueue(new TextEncoder().encode(`data: {"type":"section","section":"questions"}\n\n`));
-															}
-															
-															const question = {
-																type: "question",
-																text: questionText
-															};
-															
-															controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(question)}\n\n`));
-														}
-													}
-												}
-											} catch (parseError) {
-												// Ignore parsing errors in streaming
+							// Fetch Wikipedia and Wikidata in parallel
+							const [wikiResults, wikidataResults] = await Promise.all([
+								// Wikipedia search (existing)
+								(async () => {
+									const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+										encodeURIComponent(query) + '&format=json&origin=*&srlimit=3';
+									let titles: string[] = [];
+									try {
+										const wikiRes = await fetch(wikiURL, {
+											headers: {
+												'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)'
 											}
-										}
+										});
+										const wikiText = await wikiRes.text();
+										let wikiJson: any = { query: { search: [] } };
+										try {
+											wikiJson = JSON.parse(wikiText);
+										} catch {}
+										titles = (wikiJson?.query?.search ?? []).slice(0, 3).map((i: any) => i.title);
+									} catch (e) {
+										titles = [];
 									}
-								}
-							} finally {
-								reader.releaseLock();
+									return titles;
+								})(),
+
+								// Wikidata query (new)
+								getWikidataContext(query)
+							]);
+
+							const titles = wikiResults;
+							const wikidataWorks = wikidataResults;
+
+							send({ type: 'status', message: 'Building prompt' });
+							const prompt = buildGenealogyPrompt(query, titles, wikidataWorks);
+
+							send({ type: 'status', message: `Calling ${providerName}` });
+							const rawContent = await callModel(prompt, model, env);
+
+							send({ type: 'status', message: 'Parsing response' });
+							const parsed = parseGenealogyText(extractGenealogyContent(rawContent));
+
+							for (const item of parsed.items) {
+								send({ type: 'genealogy_item', ...item });
 							}
 
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Finalizing results"}\n\n`));
-							controller.enqueue(new TextEncoder().encode(`data: {"type":"complete"}\n\n`));
-							controller.close();
+							if (parsed.questions.length) {
+								send({ type: 'section', section: 'questions' });
+								for (const question of parsed.questions) {
+									send({ type: 'question', text: question });
+								}
+							}
 
+							send({ type: 'complete' });
 						} catch (error: any) {
 							console.error('Streaming error:', error);
-							const errorEvent = { type: 'error', message: String(error?.message ?? 'Unknown error') };
-							controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+							send({ type: 'error', message: String(error?.message ?? 'Unknown error') });
+						} finally {
 							controller.close();
 						}
 					}
