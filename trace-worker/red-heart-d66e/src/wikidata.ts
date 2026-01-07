@@ -20,7 +20,32 @@ export interface WikidataEntity {
  * Returns entity ID (e.g., "Q123") or null if not found
  */
 export async function searchWikidataEntity(concept: string): Promise<string | null> {
-  return null;
+  try {
+    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(concept)}&language=en&format=json&origin=*`;
+
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)'
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`Wikidata entity search failed: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json() as { search: WikidataEntity[] };
+
+    if (!data.search || data.search.length === 0) {
+      return null;
+    }
+
+    // Return the first matching entity ID
+    return data.search[0].id;
+  } catch (error) {
+    console.error('Wikidata entity search error:', error);
+    return null;
+  }
 }
 
 /**
