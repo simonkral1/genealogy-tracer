@@ -774,25 +774,37 @@ Your final output should be just the explanation, without any additional comment
 							// Send initial status
 							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Searching for alternative perspectives"}\n\n`));
 
-							// Wikipedia search for fresh sources
-							let titles: string[] = [];
-							try {
-								const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
-									encodeURIComponent(query) + '&format=json&origin=*&srlimit=5';
-								const wikiRes = await fetch(wikiURL, {
-									headers: {
-										'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)'
+							// Fetch alternative sources in parallel
+							const [wikiResults, wikidataResults] = await Promise.all([
+								// Wikipedia search
+								(async () => {
+									let titles: string[] = [];
+									try {
+										const wikiURL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+											encodeURIComponent(query) + '&format=json&origin=*&srlimit=5';
+										const wikiRes = await fetch(wikiURL, {
+											headers: {
+												'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)'
+											}
+										});
+										const wikiText = await wikiRes.text();
+										let wikiJson: any = { query: { search: [] } };
+										try {
+											wikiJson = JSON.parse(wikiText);
+										} catch {}
+										titles = (wikiJson?.query?.search ?? []).slice(0, 5).map((i: any) => i.title);
+									} catch (e) {
+										titles = [];
 									}
-								});
-								const wikiText = await wikiRes.text();
-								let wikiJson: any = { query: { search: [] } };
-								try {
-									wikiJson = JSON.parse(wikiText);
-								} catch {}
-								titles = (wikiJson?.query?.search ?? []).slice(0, 5).map((i: any) => i.title);
-							} catch (e) {
-								titles = [];
-							}
+									return titles;
+								})(),
+
+								// Wikidata query
+								getWikidataContext(query)
+							]);
+
+							const titles = wikiResults;
+							const wikidataWorks = wikidataResults;
 
 							controller.enqueue(new TextEncoder().encode(`data: {"type":"status","message":"Consulting alternative sources"}\n\n`));
 
@@ -815,6 +827,13 @@ Guidelines:
 - Arrange chronologically, showing alternative intellectual evolution
 
 Wikipedia references available: ${titles.join(", ")}
+
+${wikidataWorks.length > 0 ? `
+Additional chronological sources from Wikidata:
+${wikidataWorks.slice(0, 10).map((w: WikidataWork) =>
+  `- ${w.title} (${w.year}) by ${w.author}`
+).join('\n')}
+` : ''}
 
 Format your response using XML tags for easy parsing:
 
