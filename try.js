@@ -1,6 +1,7 @@
 // Web version of Concept Tracer
 document.addEventListener('DOMContentLoaded', function () {
     const conceptInput = document.getElementById('concept-input');
+    const modelSelect = document.getElementById('model-select');
     const traceButton = document.getElementById('trace-button');
     const exampleTags = document.querySelectorAll('.example-tag');
     const loadingState = document.getElementById('loading-state');
@@ -463,6 +464,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         try {
+            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4';
             const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/expand', {
                 method: 'POST',
                 headers: {
@@ -471,7 +473,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 body: JSON.stringify({
                     title: item.title,
                     year: item.year,
-                    claim: item.claim
+                    claim: item.claim,
+                    model: selectedModel
                 }),
                 signal: controller.signal
             });
@@ -666,12 +669,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         try {
+            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4';
             const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/stream', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'text/plain',
+                    'Content-Type': 'application/json',
                 },
-                body: currentQuery,
+                body: JSON.stringify({ query: currentQuery, model: selectedModel }),
                 signal: controller.signal
             });
 
@@ -918,8 +922,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // Prepare data for reinterpret endpoint
+        const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4';
         const requestData = {
             query: currentQuery,
+            model: selectedModel,
             existingGenealogy: streamedItems.map(item => ({
                 title: item.title,
                 year: item.year,

@@ -1,6 +1,7 @@
 // Etymology Explorer - Concept Tracer
 document.addEventListener('DOMContentLoaded', function () {
     const etymoInput = document.getElementById('etymo-input');
+    const modelSelect = document.getElementById('model-select');
     const etymoButton = document.getElementById('etymo-button');
     const exampleTags = document.querySelectorAll('.example-tag');
     const loadingState = document.getElementById('loading-state');
@@ -283,12 +284,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutId = setTimeout(() => controller.abort(), 60000);
 
         try {
+            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4';
             const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/etymology', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'text/plain',
+                    'Content-Type': 'application/json',
                 },
-                body: currentWord,
+                body: JSON.stringify({ word: currentWord, model: selectedModel }),
                 signal: controller.signal
             });
 

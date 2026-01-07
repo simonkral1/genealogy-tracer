@@ -18,6 +18,17 @@ interface Env {
 	TURNSTILE_SECRET?: string;
 }
 
+// Allowed models for user selection
+const ALLOWED_MODELS = ['claude-sonnet-4', 'claude-haiku-4-5', 'claude-opus-4-5-20251101'];
+const DEFAULT_MODEL = 'claude-sonnet-4';
+
+function getValidModel(requestModel: string | undefined): string {
+	if (requestModel && ALLOWED_MODELS.includes(requestModel)) {
+		return requestModel;
+	}
+	return DEFAULT_MODEL;
+}
+
 // Rate limit thresholds
 const RATE_LIMIT_FREE = 20;      // Requests/hour before captcha required
 const RATE_LIMIT_CAPTCHA = 50;   // Requests/hour before blocked entirely
@@ -131,13 +142,28 @@ export default {
 			if (rateLimitResponse) return rateLimitResponse;
 
 			try {
-				const query = await request.text();
+				const contentType = request.headers.get('content-type') || '';
+				let query = '';
+				let requestedModel: string | undefined;
+
+				if (contentType.includes('application/json')) {
+					try {
+						const body = await request.json() as any;
+						query = body?.query ?? '';
+						requestedModel = body?.model;
+					} catch {}
+				} else {
+					query = await request.text();
+				}
+
 				if (!query) {
 					return new Response(JSON.stringify({ error: 'Missing query text' }), {
 						status: 400,
 						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
 					});
 				}
+
+				const model = getValidModel(requestedModel);
 
 				// Create a streaming response
 				const stream = new ReadableStream({
@@ -243,7 +269,7 @@ Format your response using XML tags for easy parsing:
 									'anthropic-version': '2023-06-01',
 								},
 								body: JSON.stringify({
-									model: 'claude-opus-4-5-20251101',
+									model: model,
 									messages: [{ role: 'user', content: prompt }],
 									max_tokens: 1500,
 									stream: true
@@ -463,9 +489,9 @@ Open Questions:
 						'anthropic-version': '2023-06-01',
 					},
 					body: JSON.stringify({
-						model: 'claude-opus-4-5-20251101', // Updated to user-specified model
+						model: DEFAULT_MODEL,
 						messages: [{ role: 'user', content: prompt }],
-						max_tokens: 1500, // Reduced from 2048 for faster response
+						max_tokens: 1500,
 					}),
 				});
 
@@ -539,15 +565,17 @@ Open Questions:
 			if (rateLimitResponse) return rateLimitResponse;
 
 			try {
-				const requestData = await request.json() as { title?: string; year?: string; claim?: string };
-				const { title, year, claim } = requestData;
-				
+				const requestData = await request.json() as { title?: string; year?: string; claim?: string; model?: string };
+				const { title, year, claim, model: requestedModel } = requestData;
+
 				if (!title || !year || !claim) {
 					return new Response(JSON.stringify({ error: 'Missing required fields: title, year, claim' }), {
 						status: 400,
 						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
 					});
 				}
+
+				const model = getValidModel(requestedModel);
 
 				const prompt = `You are tasked with explaining a significant work in intellectual history. Your goal is to make this explanation clear, concise, and accessible to a general audience. Here are the details of the work you need to explain:
 
@@ -595,7 +623,7 @@ Your final output should be just the explanation, without any additional comment
 						'anthropic-version': '2023-06-01',
 					},
 					body: JSON.stringify({
-						model: 'claude-opus-4-5-20251101',
+						model: model,
 						messages: [{ role: 'user', content: prompt }],
 						max_tokens: 800,
 					}),
@@ -650,18 +678,21 @@ Your final output should be just the explanation, without any additional comment
 			if (rateLimitResponse) return rateLimitResponse;
 
 			try {
-				const requestData = await request.json() as { 
-					query: string; 
-					existingGenealogy: Array<{title: string; year: string; claim: string; url?: string}> 
+				const requestData = await request.json() as {
+					query: string;
+					model?: string;
+					existingGenealogy: Array<{title: string; year: string; claim: string; url?: string}>
 				};
-				const { query, existingGenealogy } = requestData;
-				
+				const { query, model: requestedModel, existingGenealogy } = requestData;
+
 				if (!query || !existingGenealogy || !Array.isArray(existingGenealogy)) {
 					return new Response(JSON.stringify({ error: 'Missing required fields: query and existingGenealogy array' }), {
 						status: 400,
 						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
 					});
 				}
+
+				const model = getValidModel(requestedModel);
 
 				// Create a streaming response
 				const stream = new ReadableStream({
@@ -773,7 +804,7 @@ Format your response using XML tags for easy parsing:
 									'anthropic-version': '2023-06-01',
 								},
 								body: JSON.stringify({
-									model: 'claude-opus-4-5-20251101',
+									model: model,
 									messages: [{ role: 'user', content: prompt }],
 									max_tokens: 1500,
 									stream: true
@@ -934,13 +965,28 @@ Format your response using XML tags for easy parsing:
 			if (rateLimitResponse) return rateLimitResponse;
 
 			try {
-				const word = await request.text();
+				const contentType = request.headers.get('content-type') || '';
+				let word = '';
+				let requestedModel: string | undefined;
+
+				if (contentType.includes('application/json')) {
+					try {
+						const body = await request.json() as any;
+						word = body?.word ?? '';
+						requestedModel = body?.model;
+					} catch {}
+				} else {
+					word = await request.text();
+				}
+
 				if (!word) {
 					return new Response(JSON.stringify({ error: 'Missing word' }), {
 						status: 400,
 						headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
 					});
 				}
+
+				const model = getValidModel(requestedModel);
 
 				const stream = new ReadableStream({
 					async start(controller) {
@@ -972,7 +1018,7 @@ Format your response using XML tags for easy parsing:
 									'anthropic-version': '2023-06-01',
 								},
 								body: JSON.stringify({
-									model: 'claude-opus-4-5-20251101',
+									model: model,
 									max_tokens: 4096,
 									stream: true,
 									messages: [{
