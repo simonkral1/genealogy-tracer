@@ -157,6 +157,28 @@ This ensures the reinterpretation is not random but systematically explores inte
 - **Error Resilience**: Continues processing even with malformed chunks
 - **Deduplication Logic**: Prevents duplicate items through content hashing
 
+### Data Sources
+
+Concept Tracer integrates multiple knowledge sources to enrich genealogies with structured data:
+
+#### Wikipedia API
+- **Primary Knowledge Base**: Main source for concept context and historical information
+- **Search Integration**: Retrieves 3-5 relevant articles per query
+- **Source Grounding**: Reduces AI hallucination through empirical references
+- **Real-time Access**: Live queries to Wikipedia's API for up-to-date information
+
+#### Wikidata SPARQL
+- **Scholarly Metadata**: Enriches genealogies with structured academic work data
+- **Entity Linking**: Connects concepts to Wikidata's knowledge graph
+- **Publication Discovery**: Finds papers, books, and articles about specific concepts
+- **Metadata Extraction**: Retrieves titles, authors, publication years, and URLs
+- **Query Performance**: ~700-1500ms per concept with 20-work limit
+- **Graceful Degradation**: Returns empty results on failures without breaking genealogies
+
+The Wikidata integration uses SPARQL queries to discover works where the concept is tagged as the main subject (property P921), providing verifiable scholarly sources that complement the AI-generated historical narratives.
+
+For detailed technical documentation, see [Wikidata Integration Guide](./trace-worker/red-heart-d66e/docs/wikidata-integration.md).
+
 ### Security & Privacy
 - **No User Tracking**: Zero persistent user data storage
 - **API Key Security**: Cloudflare secrets management for API credentials
