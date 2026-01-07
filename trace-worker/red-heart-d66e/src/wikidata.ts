@@ -115,3 +115,27 @@ export async function queryWikidataWorks(entityId: string): Promise<WikidataWork
     return [];
   }
 }
+
+/**
+ * Main function: Get Wikidata context for a concept
+ * Combines entity search + works query into single call
+ * Returns empty array on any failure (graceful degradation)
+ */
+export async function getWikidataContext(concept: string): Promise<WikidataWork[]> {
+  try {
+    // Step 1: Find entity ID for concept
+    const entityId = await searchWikidataEntity(concept);
+
+    if (!entityId) {
+      return [];
+    }
+
+    // Step 2: Query works about that entity
+    const works = await queryWikidataWorks(entityId);
+
+    return works;
+  } catch (error) {
+    console.error('Wikidata context fetch error:', error);
+    return [];
+  }
+}
