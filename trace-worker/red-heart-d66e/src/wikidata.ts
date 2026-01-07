@@ -33,6 +33,7 @@ interface SPARQLResponse {
  * Returns entity ID (e.g., "Q123") or null if not found
  */
 export async function searchWikidataEntity(concept: string): Promise<string | null> {
+  const startTime = Date.now();
   try {
     const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(concept)}&language=en&format=json&origin=*`;
 
@@ -50,13 +51,15 @@ export async function searchWikidataEntity(concept: string): Promise<string | nu
     const data = await response.json() as { search: WikidataEntity[] };
 
     if (!data.search || data.search.length === 0) {
+      console.log(`[Wikidata] No entity found for "${concept}" (${Date.now() - startTime}ms)`);
       return null;
     }
 
-    // Return the first matching entity ID
-    return data.search[0].id;
+    const entityId = data.search[0].id;
+    console.log(`[Wikidata] Found entity ${entityId} for "${concept}" (${Date.now() - startTime}ms)`);
+    return entityId;
   } catch (error) {
-    console.error('Wikidata entity search error:', error);
+    console.error(`[Wikidata] Entity search error for "${concept}":`, error);
     return null;
   }
 }
@@ -66,6 +69,7 @@ export async function searchWikidataEntity(concept: string): Promise<string | nu
  * Returns array of works with metadata
  */
 export async function queryWikidataWorks(entityId: string): Promise<WikidataWork[]> {
+  const startTime = Date.now();
   try {
     // SPARQL query to find works about this concept
     const sparqlQuery = `
@@ -90,18 +94,19 @@ export async function queryWikidataWorks(entityId: string): Promise<WikidataWork
     });
 
     if (!response.ok) {
-      console.error(`Wikidata SPARQL query failed: ${response.status}`);
+      console.error(`[Wikidata] SPARQL query failed for ${entityId}: ${response.status}`);
       return [];
     }
 
     const data = await response.json() as SPARQLResponse;
 
     if (!data.results || !data.results.bindings) {
+      console.log(`[Wikidata] No works found for entity ${entityId} (${Date.now() - startTime}ms)`);
       return [];
     }
 
     // Parse bindings into WikidataWork objects
-    return data.results.bindings
+    const works = data.results.bindings
       .filter(binding => binding.workLabel?.value) // Must have a title
       .map(binding => ({
         title: binding.workLabel!.value,
@@ -110,8 +115,11 @@ export async function queryWikidataWorks(entityId: string): Promise<WikidataWork
         wikidataUrl: binding.work?.value || ''
       }));
 
+    console.log(`[Wikidata] Found ${works.length} works for entity ${entityId} (${Date.now() - startTime}ms)`);
+    return works;
+
   } catch (error) {
-    console.error('Wikidata SPARQL query error:', error);
+    console.error(`[Wikidata] SPARQL query error for ${entityId}:`, error);
     return [];
   }
 }
@@ -122,6 +130,7 @@ export async function queryWikidataWorks(entityId: string): Promise<WikidataWork
  * Returns empty array on any failure (graceful degradation)
  */
 export async function getWikidataContext(concept: string): Promise<WikidataWork[]> {
+  const startTime = Date.now();
   try {
     // Step 1: Find entity ID for concept
     const entityId = await searchWikidataEntity(concept);
@@ -133,9 +142,10 @@ export async function getWikidataContext(concept: string): Promise<WikidataWork[
     // Step 2: Query works about that entity
     const works = await queryWikidataWorks(entityId);
 
+    console.log(`[Wikidata] Total context fetch for "${concept}": ${works.length} works (${Date.now() - startTime}ms)`);
     return works;
   } catch (error) {
-    console.error('Wikidata context fetch error:', error);
+    console.error(`[Wikidata] Context fetch error for "${concept}":`, error);
     return [];
   }
 }
