@@ -175,7 +175,7 @@ class GenealogyNetwork {
         const concept = this.concepts.get(query.toLowerCase().trim());
         if (!concept) return;
 
-        const response = await fetch('http://localhost:8787/stream', {
+        const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: query

@@ -283,7 +283,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutId = setTimeout(() => controller.abort(), 60000);
 
         try {
-            const response = await fetch('http://localhost:8787/etymology', {
+            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/etymology', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/plain',
