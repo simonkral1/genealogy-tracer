@@ -15,6 +15,19 @@ export interface WikidataEntity {
   description?: string;
 }
 
+interface SPARQLBinding {
+  workLabel?: { value: string };
+  date?: { value: string };
+  authorLabel?: { value: string };
+  work?: { value: string };
+}
+
+interface SPARQLResponse {
+  results: {
+    bindings: SPARQLBinding[];
+  };
+}
+
 /**
  * Search for a Wikidata entity by concept name
  * Returns entity ID (e.g., "Q123") or null if not found
@@ -53,5 +66,52 @@ export async function searchWikidataEntity(concept: string): Promise<string | nu
  * Returns array of works with metadata
  */
 export async function queryWikidataWorks(entityId: string): Promise<WikidataWork[]> {
-  return [];
+  try {
+    // SPARQL query to find works about this concept
+    const sparqlQuery = `
+      SELECT ?work ?workLabel ?date ?authorLabel WHERE {
+        ?work wdt:P921 wd:${entityId} .  # main subject is the concept
+        OPTIONAL { ?work wdt:P577 ?date . }  # publication date
+        OPTIONAL { ?work wdt:P50 ?authorLabel . }  # author
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+      }
+      ORDER BY ?date
+      LIMIT 20
+    `;
+
+    const queryUrl = 'https://query.wikidata.org/sparql?query=' +
+                     encodeURIComponent(sparqlQuery);
+
+    const response = await fetch(queryUrl, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'ConceptTracer/1.0 (contact: simon.kral99@gmail.com)'
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`Wikidata SPARQL query failed: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json() as SPARQLResponse;
+
+    if (!data.results || !data.results.bindings) {
+      return [];
+    }
+
+    // Parse bindings into WikidataWork objects
+    return data.results.bindings
+      .filter(binding => binding.workLabel?.value) // Must have a title
+      .map(binding => ({
+        title: binding.workLabel!.value,
+        author: binding.authorLabel?.value || 'Unknown',
+        year: binding.date?.value?.substring(0, 4) || 'Unknown',
+        wikidataUrl: binding.work?.value || ''
+      }));
+
+  } catch (error) {
+    console.error('Wikidata SPARQL query error:', error);
+    return [];
+  }
 }
