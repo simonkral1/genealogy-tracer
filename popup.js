@@ -6,6 +6,62 @@ document.addEventListener('DOMContentLoaded', function () {
   const loadingStateDiv = document.getElementById('loading-state');
   const errorStateDiv = document.getElementById('error-state');
   const errorStateP = errorStateDiv.querySelector('p');
+  const modelSelect = document.getElementById('model-select');
+  const hyperbolicKeyInput = document.getElementById('hyperbolic-key-input');
+
+  const MODEL_STORAGE_KEY = 'ct_selected_model';
+  const HYPER_KEY_STORAGE_KEY = 'ct_hyperbolic_key';
+  const DEFAULT_MODEL = 'claude-opus-4-5-20251101';
+
+  function getSelectedModel() {
+    return (modelSelect && modelSelect.value) || DEFAULT_MODEL;
+  }
+
+  function initModelPicker() {
+    if (!modelSelect) return;
+
+    chrome.storage.local.get([MODEL_STORAGE_KEY], (result) => {
+      const saved = result[MODEL_STORAGE_KEY];
+      if (saved && modelSelect.querySelector(`option[value="${saved}"]`)) {
+        modelSelect.value = saved;
+      }
+    });
+
+    modelSelect.addEventListener('change', () => {
+      const selected = getSelectedModel();
+      chrome.storage.local.set({ [MODEL_STORAGE_KEY]: selected });
+    });
+  }
+
+  initModelPicker();
+
+  function getHyperbolicKey() {
+    return hyperbolicKeyInput && hyperbolicKeyInput instanceof HTMLInputElement
+      ? hyperbolicKeyInput.value.trim()
+      : '';
+  }
+
+  function initHyperbolicKey() {
+    if (!hyperbolicKeyInput || !(hyperbolicKeyInput instanceof HTMLInputElement)) return;
+
+    chrome.storage.local.get([HYPER_KEY_STORAGE_KEY], (result) => {
+      const saved = result[HYPER_KEY_STORAGE_KEY];
+      if (typeof saved === 'string') {
+        hyperbolicKeyInput.value = saved;
+      }
+    });
+
+    hyperbolicKeyInput.addEventListener('change', () => {
+      const val = getHyperbolicKey();
+      if (val) {
+        chrome.storage.local.set({ [HYPER_KEY_STORAGE_KEY]: val });
+      } else {
+        chrome.storage.local.remove([HYPER_KEY_STORAGE_KEY]);
+      }
+    });
+  }
+
+  initHyperbolicKey();
 
   const questionsHeader = document.getElementById('questions-header');
   const questionsContent = document.getElementById('questions-content');
@@ -15,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
   async function getCachedResponse(text) {
-    const cacheKey = `trace_${text.toLowerCase().trim()}`;
+    const cacheKey = `trace_${text.toLowerCase().trim()}_${getSelectedModel()}`;
     try {
       const result = await chrome.storage.local.get([cacheKey]);
       if (result[cacheKey]) {
@@ -37,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   async function setCachedResponse(text, response) {
-    const cacheKey = `trace_${text.toLowerCase().trim()}`;
+    const cacheKey = `trace_${text.toLowerCase().trim()}_${getSelectedModel()}`;
     const cachedData = {
       response: response,
       timestamp: Date.now(),
@@ -183,7 +239,9 @@ document.addEventListener('DOMContentLoaded', function () {
         body: JSON.stringify({
           title: item.title,
           year: item.year,
-          claim: item.claim
+          claim: item.claim,
+          model: getSelectedModel(),
+          hyperbolicApiKey: getHyperbolicKey() || undefined
         })
       });
 
@@ -612,9 +670,13 @@ document.addEventListener('DOMContentLoaded', function () {
       const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/stream', {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain',
+          'Content-Type': 'application/json',
         },
-        body: selectedText
+        body: JSON.stringify({
+          query: selectedText,
+          model: getSelectedModel(),
+          hyperbolicApiKey: getHyperbolicKey() || undefined
+        })
       });
 
       if (!response.ok) {
@@ -733,7 +795,9 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         body: JSON.stringify({
           query: currentTraceText,
-          existingGenealogy: existingGenealogy
+          existingGenealogy: existingGenealogy,
+          model: getSelectedModel(),
+          hyperbolicApiKey: getHyperbolicKey() || undefined
         })
       });
 

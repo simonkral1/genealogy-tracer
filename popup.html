@@ -50,6 +50,47 @@
       letter-spacing: 1px;
       text-transform: uppercase;
     }
+    .model-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 11px;
+    }
+    .model-picker label {
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .model-picker select {
+      flex: 1;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      padding: 6px 8px;
+      border: 1px solid #cccccc;
+      background: #ffffff;
+      color: #333333;
+    }
+    .api-key-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 16px;
+      font-size: 11px;
+    }
+    .api-key-row label {
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .api-key-row input {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      padding: 6px 8px;
+      border: 1px solid #cccccc;
+      background: #ffffff;
+      color: #333333;
+    }
     .trace-container {
       position: relative;
       margin-bottom: 16px;
@@ -328,6 +369,20 @@
           <img src="icons/icon48.png" alt="Concept Tracer" class="logo">
       Concept Tracer
   </h1>
+
+  <div class="model-picker">
+    <label for="model-select">Model</label>
+    <select id="model-select">
+      <option value="claude-opus-4-5-20251101">Claude Opus 4 (default)</option>
+      <option value="Qwen3-Next-80B-A3B-Thinking">Qwen3-Next-80B-A3B-Thinking</option>
+      <option value="Kimi-K2">Kimi-K2</option>
+    </select>
+  </div>
+
+  <div class="api-key-row">
+    <label for="hyperbolic-key-input">Hyperbolic API Key</label>
+    <input id="hyperbolic-key-input" type="password" placeholder="sk_live_..." autocomplete="off" />
+  </div>
   
   <div id="intro-page" style="display:none;">
     <div style="padding: 20px 0; line-height: 1.8;">
