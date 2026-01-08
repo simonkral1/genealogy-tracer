@@ -466,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         try {
             const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4-5-20250929';
-            const response = await fetch('http://localhost:54308/expand', {
+            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/expand', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -672,7 +672,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         try {
             const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet-4-5-20250929';
-            const response = await fetch('http://localhost:54308/stream', {
+            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -967,7 +967,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         try {
-            const response = await fetch('http://localhost:54308/reinterpret', {
+            const response = await fetch('https://red-heart-d66e.simon-kral99.workers.dev/reinterpret', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
